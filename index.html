@@ -300,7 +300,13 @@ function AskPhotoButtons({onFile,size="md"}){
      capture'ı yoksayıp galeriyi açıyor.
      Çözüm: her tıkta yeni bir input DOM'a eklenir, click() çağrılır,
      seçim sonrası kaldırılır. Bu yöntem tüm tarayıcılarda çalışır. */
+  const isFileProtocol=location.protocol==="file:";
+
   const openPicker=(withCapture)=>{
+    if(withCapture && isFileProtocol){
+      alert("📷 Kamera açmak için uygulama bir web sunucusundan çalışmalı.\n\nBilgisayarınızda terminal/komut istemi açıp:\n\npython3 -m http.server 8080\n\nyazın, sonra tarayıcıdan:\nhttp://localhost:8080/soru-sor.html\n\nadresini açın.");
+      return;
+    }
     const inp=document.createElement("input");
     inp.type="file";
     inp.accept="image/*";
@@ -315,7 +321,6 @@ function AskPhotoButtons({onFile,size="md"}){
       try{document.body.removeChild(inp);}catch{}
     });
     document.body.appendChild(inp);
-    // setTimeout zorunlu — bazı tarayıcılar user-gesture zincirini kaybediyor
     setTimeout(()=>inp.click(), 0);
   };
 
@@ -934,16 +939,7 @@ function App(){
             ⚠️ Henüz sistem kurulmadı. İlk öğretmen kayıt olduğunda kurum kodu ve okul sisteme kilitlenir.
           </div>
         )}
-        <div style={{textAlign:"center",marginTop:14}}>
-          <button onClick={()=>{
-            if(window.confirm("Tüm veriler silinecek. Emin misiniz?")){
-              localStorage.removeItem("soruSorDB");
-              window.location.reload();
-            }
-          }} style={{background:"none",border:"none",color:"#cbd5e1",fontSize:11,cursor:"pointer",textDecoration:"underline"}}>
-            Veriyi sıfırla (sorun yaşıyorsanız)
-          </button>
-        </div>
+
       </div>
       <Toast/>
     </div>
