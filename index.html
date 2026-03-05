@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800&display=swap" rel="stylesheet"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -143,8 +144,76 @@ const normCmp=s=>s.trim().toLowerCase().replace(/ğ/g,"g").replace(/ü/g,"u").re
 // btoa Türkçe karakterlerde hata verir — basit ama güvenli hash
 const hashPw=s=>{let h=0;for(let i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}return"h"+Math.abs(h).toString(36);};
 
-function loadDB(){try{return JSON.parse(localStorage.getItem("soruSorDB")||"{}");}catch{return{};}}
-function saveDB(d){try{localStorage.setItem("soruSorDB",JSON.stringify(d));}catch{}}
+const SUPABASE_URL="https://fmijczpyjezqqwjkpgrf.supabase.co";
+const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtaWpjenB5amV6cXF3amtwZ3JmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTQyOTIsImV4cCI6MjA4NzQzMDI5Mn0.NyBMy9kzIyGuk7DKYM2wfxCWy7x0PMvrH_wy7UBHMRQ";
+const SUPABASE_TABLE="soru_sor_state";
+const SUPABASE_ROW_ID="main";
+const LOCAL_CACHE_KEY="soruSorDBCache";
+const IS_PREVIEW=window.self!==window.top||window.location.hostname==="localhost"||window.location.protocol==="blob:";
+const DEFAULT_DB={
+  teachers:[],
+  students:[],
+  pending:[],
+  questions:[],
+  notifs:{},
+  config:{school:"",kurumKodu:"",days:3,autoDel:false},
+  schoolData:{schoolName:"",classes:[]},
+};
+
+function createMockClient(){
+  const read=()=>{try{return JSON.parse(localStorage.getItem(LOCAL_CACHE_KEY)||"{}");}catch{return{};}};
+  const write=payload=>{try{localStorage.setItem(LOCAL_CACHE_KEY,JSON.stringify(payload));}catch{}};
+  return{
+    from(){
+      return{
+        select(){
+          return{
+            eq(){
+              return{
+                async single(){const payload=read();return{data:Object.keys(payload).length?{id:SUPABASE_ROW_ID,payload}:null,error:null};}
+              };
+            }
+          };
+        },
+        async upsert(row){write(row.payload||{});return{data:row,error:null};}
+      };
+    }
+  };
+}
+
+const sb=!IS_PREVIEW&&window.supabase?.createClient
+  ?window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}})
+  :createMockClient();
+
+function loadLocalCache(){try{return JSON.parse(localStorage.getItem(LOCAL_CACHE_KEY)||"{}");}catch{return{};}}
+function saveLocalCache(d){try{localStorage.setItem(LOCAL_CACHE_KEY,JSON.stringify(d));}catch{}}
+
+async function saveDB(d){
+  const payload=JSON.parse(JSON.stringify(d));
+  saveLocalCache(payload);
+  const {error}=await sb.from(SUPABASE_TABLE).upsert({id:SUPABASE_ROW_ID,payload,updated_at:new Date().toISOString()});
+  if(error)throw error;
+  return payload;
+}
+
+async function loadDB(){
+  try{
+    const {data,error}=await sb.from(SUPABASE_TABLE).select("payload").eq("id",SUPABASE_ROW_ID).single();
+    if(error)throw error;
+    if(data?.payload){
+      const merged={...DEFAULT_DB,...data.payload};
+      saveLocalCache(merged);
+      return merged;
+    }
+    const cached=loadLocalCache();
+    const merged={...DEFAULT_DB,...cached};
+    await saveDB(merged);
+    return merged;
+  }catch(err){
+    console.error("Supabase veri yukleme hatasi:",err);
+    return {...DEFAULT_DB,...loadLocalCache()};
+  }
+}
 
 /* ─── PRİMİTİFLER ─── */
 const Ava=({i,c="#6366f1",s=40,ring,photo})=>
@@ -581,22 +650,46 @@ function App(){
      config.school     : okul adı (ilk adminden)
      config.kurumKodu  : kurum kodu (ilk adminden) — sonraki herkes eşleşmek zorunda
   */
-  const[db,setDb]=useState(()=>{
-    const d=loadDB();
-    return{
-      teachers:  d.teachers  ||[],  // {id,name,school,kurumKodu,passHash,branches[],isAdmin,approved,col,av,solved,role,ts}
-      students:  d.students  ||[],  // {id,name,number,cls,school,kurumKodu,passHash,col,av,photo,approved,pdfMatched,qCount,role}
-      pending:   d.pending   ||[],  // bekleyen kayıtlar (hem öğrenci hem öğretmen)
-      questions: d.questions ||[],
-      notifs:    d.notifs    ||{},
-      config:    d.config    ||{school:"",kurumKodu:"",days:3,autoDel:false},
-      schoolData:d.schoolData||{schoolName:"",classes:[]},
-    };
-  });
+  const[db,setDb]=useState(DEFAULT_DB);
+  const[booting,setBooting]=useState(true);
+  const[syncState,setSyncState]=useState({busy:false,error:""});
+
+  useEffect(()=>{
+    let alive=true;
+    (async()=>{
+      const remote=await loadDB();
+      if(!alive)return;
+      setDb({
+        teachers:remote.teachers||[],
+        students:remote.students||[],
+        pending:remote.pending||[],
+        questions:remote.questions||[],
+        notifs:remote.notifs||{},
+        config:remote.config||DEFAULT_DB.config,
+        schoolData:remote.schoolData||DEFAULT_DB.schoolData,
+      });
+      setBooting(false);
+    })();
+    return()=>{alive=false;};
+  },[]);
+
+  const queueSave=useCallback((next)=>{
+    setSyncState({busy:true,error:""});
+    saveDB(next)
+      .then(()=>setSyncState({busy:false,error:""}))
+      .catch(err=>{
+        console.error("Supabase kaydetme hatasi:",err);
+        setSyncState({busy:false,error:"Bulut kaydi basarisiz. Baglanti veya tablo yapisini kontrol edin."});
+      });
+  },[]);
 
   const persist=useCallback((updates)=>{
-    setDb(prev=>{const next={...prev,...updates};saveDB(next);return next;});
-  },[]);
+    setDb(prev=>{
+      const next={...prev,...updates};
+      queueSave(next);
+      return next;
+    });
+  },[queueSave]);
 
   /* ── Oturum ── */
   const[user,setUser]=useState(null);
@@ -641,6 +734,11 @@ function App(){
   const mrRef=useRef();const acRef=useRef([]);
 
   const toast_=(m,err=false)=>{setToast(m);setTE(err);setTimeout(()=>setToast(null),3500);};
+  const SyncBadge=()=>syncState.error
+    ?<div style={{position:"fixed",top:12,right:12,zIndex:4000,background:"#fff1f2",color:"#be123c",border:"1.5px solid #fecdd3",borderRadius:12,padding:"8px 12px",fontSize:12,fontWeight:800,boxShadow:"0 8px 22px rgba(190,24,93,.12)"}}>Bulut baglantisi hatali</div>
+    :syncState.busy
+      ?<div style={{position:"fixed",top:12,right:12,zIndex:4000,background:"#eef2ff",color:"#4338ca",border:"1.5px solid #c7d2fe",borderRadius:12,padding:"8px 12px",fontSize:12,fontWeight:800,boxShadow:"0 8px 22px rgba(67,56,202,.12)"}}>Kaydediliyor...</div>
+      :null;
 
   /* ────── PDF YÜKLEYİCİ ────── */
   const pdfInputRef=useRef();
@@ -876,6 +974,16 @@ function App(){
     boxShadow:"0 10px 32px rgba(0,0,0,.18)",zIndex:9999,animation:"pop .3s ease",
     fontSize:14,maxWidth:"90vw",textAlign:"center",border:"1.5px solid rgba(255,255,255,.25)"}}>{toast}</div>:null;
 
+  if(booting)return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#e0e7ff 0%,#f5f3ff 50%,#fce7f3 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:20}}>
+      <div style={{background:"rgba(255,255,255,.94)",borderRadius:28,padding:"28px 32px",maxWidth:420,width:"100%",textAlign:"center",boxShadow:"0 24px 64px rgba(99,102,241,.17)",border:"1.5px solid rgba(255,255,255,.9)"}}>
+        <div style={{fontSize:52,marginBottom:10,animation:"float 3s ease-in-out infinite",display:"inline-block"}}>☁️</div>
+        <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:28,fontWeight:800,color:"#312e81"}}>Supabase baglaniyor</div>
+        <div style={{marginTop:8,color:"#64748b",fontSize:14,fontWeight:700}}>Uygulama verileri buluttan yukleniyor...</div>
+      </div>
+    </div>
+  );
+
   /* ════ GİRİŞ EKRANI ════ */
   if(page==="login") return(
     <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#e0e7ff 0%,#f5f3ff 50%,#fce7f3 100%)",
@@ -941,6 +1049,7 @@ function App(){
         )}
 
       </div>
+      <SyncBadge/>
       <Toast/>
     </div>
   );
@@ -1032,6 +1141,7 @@ function App(){
           </button>
         </div>
       </div>
+      <SyncBadge/>
       <Toast/>
     </div>
   );
@@ -1413,6 +1523,7 @@ function App(){
         </div>
       </Modal>
 
+      <SyncBadge/>
       <Toast/>
     </div>
   );
