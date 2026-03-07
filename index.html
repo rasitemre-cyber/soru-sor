@@ -290,7 +290,8 @@ const DB = {
   },
   async upsertQuestion(q){
     const row={...q,answers:JSON.stringify(q.answers||[])};
-    await sb.from("questions").upsert(row,{onConflict:"id"});
+    const r=await sb.from("questions").upsert(row,{onConflict:"id"});
+    if(r.error)throw new Error("Soru kaydı hatası: "+r.error.message);
   },
 
   // Bildirimler
@@ -1029,11 +1030,14 @@ function App(){
     if(!aF.branch||!aF.text){toast_("Branş ve soru boş olamaz!",true);return;}
     const q={id:uid(),kurum_kodu:user.kurum_kodu,
       sid:user.id,s_name:user.name,s_col:user.col||"#6366f1",s_photo:user.photo||null,
-      sName:user.name,sCol:user.col||"#6366f1",sPhoto:user.photo||null,
       cls:user.cls||"",branch:aF.branch,text:aF.text,img:aF.img,
       ts:new Date().toISOString(),answers:[],views:0};
 
-    await DB.upsertQuestion(q);
+    try{
+      await DB.upsertQuestion(q);
+    }catch(err){
+      toast_("Soru gönderilemedi: "+err.message,true);return;
+    }
 
     // Bildirimleri gönder
     for(const t of teachers.filter(t=>t.branches?.includes(aF.branch)&&t.approved)){
