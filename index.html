@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>📚 SORU SOR</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Baloo+2:wght@700;800&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body,#root{height:100%;font-family:'Nunito',sans-serif;background:#f0f4ff;}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:#f0f4ff;}
+::-webkit-scrollbar-thumb{background:#c7d2fe;border-radius:99px;}
+@keyframes pop{0%{transform:scale(.88);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
+@keyframes slideUp{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes wiggle{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes pulseR{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.9)}}
+@keyframes bounceY{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ch{transition:transform .2s,box-shadow .2s;}
+.ch:hover{transform:translateY(-3px);box-shadow:0 14px 36px rgba(99,102,241,.15)!important;}
+.pr:active{transform:scale(.96)!important;}
+textarea,input,select,button{font-family:'Nunito',sans-serif;}
+#pdfOverlay{position:fixed;inset:0;background:rgba(17,24,80,.6);z-index:3000;display:none;
+  flex-direction:column;align-items:center;justify-content:center;}
+#pdfOverlay.show{display:flex;}
+.pdf-spin{width:48px;height:48px;border:4px solid rgba(255,255,255,.2);
+  border-top-color:#a5b4fc;border-radius:50%;animation:spin 1s linear infinite;margin-bottom:16px;}
+
+/* Kamera modal */
+#cameraModal{position:fixed;inset:0;background:rgba(17,24,80,.75);z-index:4000;display:none;
+  flex-direction:column;align-items:center;justify-content:center;padding:16px;}
+#cameraModal.show{display:flex;}
+#cameraModal .cam-box{background:#1e1b4b;border-radius:22px;overflow:hidden;
+  width:100%;max-width:480px;box-shadow:0 32px 80px rgba(0,0,0,.5);}
+#cameraModal video{width:100%;display:block;max-height:360px;object-fit:cover;}
+#cameraModal .cam-bar{padding:14px 18px;display:flex;gap:10px;align-items:center;justify-content:center;background:#12103a;}
+</style>
+</head>
+<body>
+
+<div id="pdfOverlay">
+  <div class="pdf-spin"></div>
+  <div id="pdfTxt" style="color:#e0e7ff;font-size:15px;font-weight:700;">PDF işleniyor...</div>
+  <div id="pdfProg" style="color:#a5b4fc;font-size:13px;margin-top:6px;"></div>
+</div>
+
+<!-- Kamera Modal (WebRTC) -->
+<div id="cameraModal">
+  <div class="cam-box">
+    <video id="camVideo" autoplay playsinline muted></video>
+    <div class="cam-bar">
+      <button id="camCapture" style="background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border:none;
+        border-radius:50%;width:60px;height:60px;font-size:26px;cursor:pointer;
+        box-shadow:0 4px 18px #6366f155;transition:transform .15s;" title="Fotoğraf Çek">📷</button>
+      <button id="camSwitch" style="background:rgba(255,255,255,.12);color:#fff;border:none;
+        border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;" title="Kamera Değiştir">🔄</button>
+      <button id="camClose" style="background:rgba(239,68,68,.25);color:#fff;border:none;
+        border-radius:50%;width:44px;height:44px;font-size:18px;cursor:pointer;" title="Kapat">✕</button>
+    </div>
+  </div>
+  <canvas id="camCanvas" style="display:none;"></canvas>
+</div>
+
+<div id="root"></div>
+
+<!-- ══ SUPABASE CONFIG ══ -->
+<script>
+const SUPABASE_URL = "https://cwiaiizwxmjoiwmerava.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aWFpaXp3eG1qb2l3bWVyYXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4OTY5NjEsImV4cCI6MjA4ODQ3Mjk2MX0.iZeK7r8sm5j61apKfPMNgcEVyGjIallWv3EfF9uHFmE";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+</script>
+
+<!-- ══ PDF.js PARSER (e-Okul format) ══ -->
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const COL_BOUNDS = [0,107,177,247,322,392,462,535,600];
+function getCol(x){for(let i=0;i<COL_BOUNDS.length-1;i++)if(x>=COL_BOUNDS[i]&&x<COL_BOUNDS[i+1])return i;return -1;}
+
+async function parsePage(page){
+  const pageH=page.view[3],scale=1.5,vp=page.getViewport({scale});
+  const cvs=document.createElement('canvas');cvs.width=vp.width;cvs.height=vp.height;
+  await page.render({canvasContext:cvs.getContext('2d'),viewport:vp}).promise;
+  const tc=await page.getTextContent();
+  const TOL=4,rcm={},ryReal={};
+  tc.items.forEach(item=>{
+    const s=item.str;if(!s.trim())return;
+    const x=item.transform[4],yPdf=item.transform[5];
+    const yTop=Math.round((pageH-yPdf)/TOL)*TOL,col=getCol(x);
+    if(col<0)return;
+    if(!rcm[yTop]){rcm[yTop]={};ryReal[yTop]=pageH-yPdf;}
+    if(!rcm[yTop][col])rcm[yTop][col]=[];
+    rcm[yTop][col].push({x,s});
+  });
+  const sYs=Object.keys(rcm).map(Number).sort((a,b)=>a-b);
+  const rd={};
+  sYs.forEach(y=>{rd[y]={};Object.entries(rcm[y]).forEach(([c,pts])=>{rd[y][parseInt(c)]=pts.sort((a,b)=>a.x-b.x).map(p=>p.s).join('');});});
+
+  let className=null,schoolName='';
+  for(const y of sYs.slice(0,8)){
+    const line=Object.values(rd[y]).join(' ').replace(/\s+/g,' ').trim();
+    if(!schoolName&&(line.includes('Müdürlüğü')||line.includes('Okulu')))
+      schoolName=line.replace(/.*\/\s*/,'').replace(/\s*[Mm]üdürlüğü.*/i,'').trim();
+    const cm=line.match(/(\d+)\.\s*S[iı]n[iı]f\s*[\/\s]+([A-ZÇĞİÖŞÜ])\s*[Şş]ubesi/i);
+    if(cm){className=`${cm[1]}. Sınıf / ${cm[2].toUpperCase()} Şubesi`;break;}
+  }
+  if(!className)return null;
+
+  const isNum=s=>/^\d{1,4}$/.test(s.trim());
+  const isName=s=>/^[A-ZÇĞİÖŞÜa-zçğışöü\s]{2,50}$/.test(s.trim())&&/[A-ZÇĞİÖŞÜ]/.test(s);
+  const ci=Array.from({length:8},()=>[]);
+  sYs.forEach(y=>{if(y<100)return;Object.entries(rd[y]).forEach(([c,val])=>{const col=parseInt(c),v=val.trim();if(!v)return;if(isNum(v))ci[col].push({y,val:v,type:'num'});else if(isName(v))ci[col].push({y,val:v,type:'name'});});});
+
+  const all=[];
+  ci.forEach((items,col)=>{
+    const sorted=[...items].sort((a,b)=>a.y-b.y);let nb='',ny=null;
+    sorted.forEach(({y,val,type})=>{
+      if(type==='name'){nb=nb?nb+' '+val:val;if(ny===null)ny=y;}
+      else if(type==='num'&&nb.trim().length>2){all.push({rowY:ny,col,name:nb.trim(),number:val});nb='';ny=null;}
+      else if(type==='num'){nb='';ny=null;}
+    });
+  });
+  all.sort((a,b)=>a.rowY!==b.rowY?a.rowY-b.rowY:a.col-b.col);
+  if(!all.length)return null;
+
+  const PX_FIRST=98,PX_STEP=106,PY_FIRST=137,PY_STEP=139,PW=48,PH=80;
+  const uRYs=[...new Set(all.map(s=>Math.round(s.rowY/10)*10))].sort((a,b)=>a-b);
+  const ryIdx={};uRYs.forEach((y,i)=>{ryIdx[Math.round(y/10)*10]=i;});
+  const students=all.map(st=>{
+    const ri=ryIdx[Math.round(st.rowY/10)*10]??0,ci2=st.col;
+    const px=PX_FIRST+ci2*PX_STEP,py=PY_FIRST+ri*PY_STEP;
+    let photoData=null;
+    if(px+PW<=cvs.width&&py+PH<=cvs.height){
+      const t=document.createElement('canvas');t.width=PW;t.height=PH;
+      t.getContext('2d').drawImage(cvs,px,py,PW,PH,0,0,PW,PH);
+      photoData=t.toDataURL('image/jpeg',0.85);
+    }
+    return{name:st.name,number:st.number,photoData};
+  });
+  return{name:className,school:schoolName,students};
+}
+
+window.parsePDF=async function(file,onProgress){
+  const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+  const total=pdf.numPages;const classes=[];let schoolName='';
+  for(let p=1;p<=total;p++){
+    if(onProgress)onProgress(`Sayfa ${p} / ${total} işleniyor...`);
+    const cls=await parsePage(await pdf.getPage(p));
+    if(!cls)continue;
+    if(!schoolName&&cls.school)schoolName=cls.school;
+    classes.push(cls);
+  }
+  return{schoolName,classes};
+};
+</script>
+
+<!-- ══ KAMERA YÖNETİCİSİ ══ -->
+<script>
+window.CameraManager = (function(){
+  let stream = null;
+  let facingMode = "environment";
+  let onCaptureCb = null;
+
+  const modal  = ()=>document.getElementById("cameraModal");
+  const video  = ()=>document.getElementById("camVideo");
+  const canvas = ()=>document.getElementById("camCanvas");
+
+  async function startCamera(){
+    try{
+      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+      stream = await navigator.mediaDevices.getUserMedia({
+        video:{ facingMode, width:{ideal:1280}, height:{ideal:720} },
+        audio:false
+      });
+      video().srcObject = stream;
+    }catch(err){
+      console.error("Kamera hatası:",err);
+      alert("📷 Kamera açılamadı: "+err.message);
+      closeCamera();
+    }
+  }
+
+  function closeCamera(){
+    if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
+    modal().classList.remove("show");
+  }
+
+  function capture(){
+    const v=video(), c=canvas();
+    c.width=v.videoWidth||640; c.height=v.videoHeight||480;
+    c.getContext("2d").drawImage(v,0,0);
+    const dataUrl = c.toDataURL("image/jpeg",0.92);
+    closeCamera();
+    if(onCaptureCb) onCaptureCb(dataUrl);
+  }
+
+  async function switchCamera(){
+    facingMode = facingMode==="environment"?"user":"environment";
+    await startCamera();
+  }
+
+  // Buton bağlantıları
+  document.addEventListener("DOMContentLoaded",()=>{
+    document.getElementById("camCapture").onclick = capture;
+    document.getElementById("camClose").onclick   = closeCamera;
+    document.getElementById("camSwitch").onclick  = switchCamera;
+  });
+
+  return {
+    open: function(cb){
+      onCaptureCb = cb;
+      modal().classList.add("show");
+      startCamera();
+    }
+  };
+})();
+</script>
+
+<!-- ══ REACT APP ══ -->
+<script type="text/babel">
+const{useState,useRef,useCallback,useEffect}=React;
+
+/* ══ SUPABASE VERİTABANI KATMANI ══ */
+const DB = {
+  // Okulun kurum koduna göre config çek / oluştur
+  async getConfig(kurumKodu){
+    const{data}=await sb.from("config").select("*").eq("kurum_kodu",kurumKodu).single();
+    return data;
+  },
+  async setConfig(kurumKodu, schoolName){
+    const{data}=await sb.from("config").upsert({kurum_kodu:kurumKodu,school_name:schoolName},{onConflict:"kurum_kodu"}).select().single();
+    return data;
+  },
+
+  // schoolData
+  async getSchoolData(kurumKodu){
+    const{data}=await sb.from("school_data").select("*").eq("kurum_kodu",kurumKodu).single();
+    return data ? JSON.parse(data.data) : {schoolName:"",classes:[]};
+  },
+  async setSchoolData(kurumKodu, schoolData){
+    await sb.from("school_data").upsert({kurum_kodu:kurumKodu,data:JSON.stringify(schoolData)},{onConflict:"kurum_kodu"});
+  },
+
+  // Kullanıcılar
+  async getTeachers(kurumKodu){
+    const{data}=await sb.from("teachers").select("*").eq("kurum_kodu",kurumKodu);
+    return data||[];
+  },
+  async upsertTeacher(t){
+    await sb.from("teachers").upsert(t,{onConflict:"id"});
+  },
+  async deleteTeacher(id){
+    await sb.from("teachers").delete().eq("id",id);
+  },
+
+  async getStudents(kurumKodu){
+    const{data}=await sb.from("students").select("*").eq("kurum_kodu",kurumKodu);
+    return data||[];
+  },
+  async upsertStudent(s){
+    await sb.from("students").upsert(s,{onConflict:"id"});
+  },
+  async deleteStudent(id){
+    await sb.from("students").delete().eq("id",id);
+  },
+
+  async getPending(kurumKodu){
+    const{data}=await sb.from("pending").select("*").eq("kurum_kodu",kurumKodu);
+    return data||[];
+  },
+  async addPending(p){
+    await sb.from("pending").insert(p);
+  },
+  async deletePending(id){
+    await sb.from("pending").delete().eq("id",id);
+  },
+
+  // Sorular
+  async getQuestions(kurumKodu){
+    const{data}=await sb.from("questions").select("*").eq("kurum_kodu",kurumKodu).order("ts",{ascending:false});
+    return (data||[]).map(q=>({...q,answers:typeof q.answers==="string"?JSON.parse(q.answers):q.answers||[]}));
+  },
+  async upsertQuestion(q){
+    const row={...q,answers:JSON.stringify(q.answers||[])};
+    await sb.from("questions").upsert(row,{onConflict:"id"});
+  },
+
+  // Bildirimler
+  async getNotifs(kurumKodu,userId){
+    const{data}=await sb.from("notifs").select("*").eq("kurum_kodu",kurumKodu).eq("user_id",userId).order("ts",{ascending:false});
+    return data||[];
+  },
+  async addNotif(n){
+    await sb.from("notifs").insert(n);
+  },
+  async markNotifRead(id){
+    await sb.from("notifs").update({read:true}).eq("id",id);
+  },
+};
+
+const BRANCHES=["Matematik","Fen Bilimleri","Fizik","Kimya","Biyoloji","Türkçe","Edebiyat","Tarih","Coğrafya","İngilizce","Almanca","Müzik","Resim","Beden Eğitimi","Bilişim"];
+const BE={Matematik:"🔢","Fen Bilimleri":"🔬",Fizik:"⚡",Kimya:"🧪",Biyoloji:"🌿",Türkçe:"📖",Edebiyat:"✍️",Tarih:"🏛️",Coğrafya:"🌍",İngilizce:"🇬🇧",Almanca:"🇩🇪",Müzik:"🎵",Resim:"🎨","Beden Eğitimi":"⚽",Bilişim:"💻"};
+const BC={Matematik:"#6366f1","Fen Bilimleri":"#0d9488",Fizik:"#f59e0b",Kimya:"#10b981",Biyoloji:"#22c55e",Türkçe:"#ef4444",Edebiyat:"#8b5cf6",Tarih:"#d97706",Coğrafya:"#0ea5e9",İngilizce:"#3b82f6",Almanca:"#64748b",Müzik:"#ec4899",Resim:"#f97316","Beden Eğitimi":"#84cc16",Bilişim:"#06b6d4"};
+const COLORS=["#6366f1","#ec4899","#10b981","#f59e0b","#8b5cf6","#0ea5e9","#ef4444","#f97316"];
+
+const ago=t=>{const d=Date.now()-new Date(t),m=Math.floor(d/6e4);if(m<1)return"az önce";if(m<60)return m+"dk";const h=Math.floor(m/60);return h<24?h+"sa":Math.floor(h/24)+"gün";};
+const uid=()=>Math.random().toString(36).substr(2,8);
+const normName=s=>s.trim().toLowerCase().replace(/(?:^|\s)\S/g,c=>c.toUpperCase());
+const normCmp=s=>s.trim().toLowerCase().replace(/ğ/g,"g").replace(/ü/g,"u").replace(/ş/g,"s").replace(/ı/g,"i").replace(/ö/g,"o").replace(/ç/g,"c").replace(/\s+/g," ");
+const hashPw=s=>{let h=0;for(let i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCodeAt(i)|0;}return"h"+Math.abs(h).toString(36);};
+
+/* ─── PRİMİTİFLER ─── */
+const Ava=({i,c="#6366f1",s=40,ring,photo})=>
+  <div style={{width:s,height:s,borderRadius:photo?"10px":"50%",background:`linear-gradient(135deg,${c},${c}99)`,
+    display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:900,
+    fontSize:s*.34,flexShrink:0,overflow:"hidden",
+    boxShadow:ring?`0 0 0 3px #fff,0 0 0 6px ${c}44`:`0 3px 10px ${c}44`}}>
+    {photo?<img src={photo} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:i}
+  </div>;
+
+const Tag=({label,color="#6366f1",emoji=""})=>
+  <span style={{background:`${color}18`,color,border:`1.5px solid ${color}28`,borderRadius:99,
+    padding:"2px 9px",fontSize:11,fontWeight:700,display:"inline-flex",alignItems:"center",gap:3,whiteSpace:"nowrap"}}>
+    {emoji&&<span>{emoji}</span>}{label}
+  </span>;
+
+function Btn({label,onClick,v="primary",sz="md",disabled,full,sx={}}){
+  const vs={
+    primary:{bg:"linear-gradient(135deg,#6366f1,#8b5cf6)",c:"#fff",sh:"0 4px 14px #6366f155"},
+    pink:{bg:"linear-gradient(135deg,#ec4899,#f43f5e)",c:"#fff",sh:"0 4px 14px #ec489944"},
+    green:{bg:"linear-gradient(135deg,#10b981,#059669)",c:"#fff",sh:"0 4px 14px #10b98144"},
+    danger:{bg:"linear-gradient(135deg,#ef4444,#dc2626)",c:"#fff",sh:"0 4px 14px #ef444444"},
+    ghost:{bg:"#fff",c:"#6366f1",brd:"2px solid #e0e7ff",sh:"none"},
+    soft:{bg:"#eef2ff",c:"#6366f1",sh:"none"},
+  };
+  const ss={sm:{p:"5px 13px",fs:12,br:10},md:{p:"10px 20px",fs:14,br:13},lg:{p:"13px 26px",fs:15,br:15}};
+  const s=vs[v],S=ss[sz];
+  return <button onClick={onClick} disabled={disabled} className="pr"
+    style={{background:s.bg,color:s.c,border:s.brd||"none",boxShadow:s.sh,padding:S.p,
+      fontSize:S.fs,borderRadius:S.br,fontWeight:800,cursor:disabled?"not-allowed":"pointer",
+      opacity:disabled?.6:1,width:full?"100%":"auto",transition:"all .18s",...sx}}
+    onMouseEnter={e=>{if(!disabled){e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.filter="brightness(1.06)";}}}
+    onMouseLeave={e=>{e.currentTarget.style.transform="none";e.currentTarget.style.filter="none";}}>
+    {label}
+  </button>;
+}
+
+function Card({children,sx={},hover=true,delay=0}){
+  return <div className={hover?"ch":""} style={{background:"#fff",borderRadius:20,
+    boxShadow:"0 2px 16px rgba(99,102,241,.07)",border:"1.5px solid #eaedff",padding:20,
+    animation:`slideUp .3s ${delay}s ease both`,...sx}}>{children}</div>;
+}
+
+function Modal({open,onClose,title,children,w=520}){
+  if(!open)return null;
+  return <div style={{position:"fixed",inset:0,background:"rgba(17,24,80,.45)",zIndex:1000,
+    display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(7px)",padding:16}}
+    onClick={e=>e.target===e.currentTarget&&onClose()}>
+    <div style={{background:"#fff",borderRadius:26,width:"100%",maxWidth:w,maxHeight:"90vh",
+      overflow:"auto",boxShadow:"0 32px 80px rgba(99,102,241,.22)",animation:"pop .24s ease"}}>
+      <div style={{padding:"17px 22px 13px",borderBottom:"1.5px solid #f0f4ff",display:"flex",
+        alignItems:"center",justifyContent:"space-between",position:"sticky",top:0,
+        background:"#fff",zIndex:1,borderRadius:"26px 26px 0 0"}}>
+        <span style={{fontFamily:"'Baloo 2',sans-serif",fontSize:17,fontWeight:800,color:"#312e81"}}>{title}</span>
+        <button onClick={onClose} style={{background:"#eef2ff",border:"none",borderRadius:10,
+          width:30,height:30,cursor:"pointer",color:"#6366f1",fontWeight:800,fontSize:14,
+          display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+      </div>
+      <div style={{padding:22}}>{children}</div>
+    </div>
+  </div>;
+}
+
+function Inp({label,type="text",value,onChange,onKeyDown,placeholder,required,icon,error,readOnly}){
+  const[f,sf]=useState(false);
+  return <div style={{marginBottom:13}}>
+    {label&&<label style={{display:"block",marginBottom:5,fontSize:13,fontWeight:700,color:"#4338ca"}}>
+      {label}{required&&<span style={{color:"#ec4899"}}> ✦</span>}
+    </label>}
+    <div style={{position:"relative"}}>
+      {icon&&<span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:15,pointerEvents:"none"}}>{icon}</span>}
+      <input type={type} value={value} onChange={onChange} onKeyDown={onKeyDown} placeholder={placeholder} readOnly={readOnly}
+        style={{width:"100%",padding:`10px ${icon?"36px":"13px"} 10px ${icon?"36px":"13px"}`,
+          border:`2px solid ${error?"#fca5a5":f?"#6366f1":"#e8eeff"}`,borderRadius:13,fontSize:14,
+          outline:"none",color:"#1e1b4b",background:readOnly?"#f0f4ff":f?"#fafbff":"#f8faff",
+          boxSizing:"border-box",transition:"border .18s,background .18s"}}
+        onFocus={()=>sf(true)} onBlur={()=>sf(false)}/>
+    </div>
+    {error&&<div style={{fontSize:12,color:"#ef4444",marginTop:4,fontWeight:600}}>{error}</div>}
+  </div>;
+}
+
+const BPill=({branch,selected,onClick})=>{
+  const c=BC[branch]||"#6366f1";
+  return <button onClick={onClick} style={{background:selected?`${c}1a`:"#f8faff",
+    border:`2px solid ${selected?c:"#e8eeff"}`,borderRadius:99,padding:"4px 11px",
+    fontSize:11,fontWeight:700,color:selected?c:"#94a3b8",
+    cursor:onClick?"pointer":"default",transition:"all .15s",whiteSpace:"nowrap"}}>
+    {BE[branch]||"📚"} {branch}
+  </button>;
+};
+
+function QCard({q,sel,onClick}){
+  const c=BC[q.branch]||"#6366f1",ans=q.answers.length>0;
+  return <div onClick={()=>onClick(q)} className="ch"
+    style={{background:sel?"linear-gradient(135deg,#eef2ff,#f5f3ff)":"#fff",
+      border:`2px solid ${sel?c+"88":"#eaedff"}`,borderRadius:18,padding:"13px 15px",
+      cursor:"pointer",marginBottom:10,transition:"all .2s",
+      boxShadow:sel?`0 6px 22px ${c}22`:"0 2px 8px rgba(99,102,241,.05)",
+      position:"relative",overflow:"hidden"}}>
+    {sel&&<div style={{position:"absolute",left:0,top:0,bottom:0,width:4,
+      background:`linear-gradient(${c},${c}66)`,borderRadius:"4px 0 0 4px"}}/>}
+    <div style={{display:"flex",gap:10}}>
+      <Ava i={q.sName.split(" ").map(w=>w[0]).join("")} c={q.sCol||"#6366f1"} s={36} photo={q.sPhoto}/>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:"flex",flexWrap:"wrap",gap:5,alignItems:"center",marginBottom:4}}>
+          <span style={{fontWeight:800,fontSize:13,color:"#1e1b4b"}}>{q.sName}</span>
+          <BPill branch={q.branch}/>
+          <span style={{marginLeft:"auto",background:ans?"#dcfce7":"#fef3c7",
+            color:ans?"#16a34a":"#d97706",borderRadius:99,padding:"2px 8px",fontSize:11,fontWeight:700}}>
+            {ans?`✅ ${q.answers.length}`:"⏳ Bekliyor"}
+          </span>
+        </div>
+        <p style={{fontSize:13,color:"#475569",lineHeight:1.5,overflow:"hidden",
+          display:"-webkit-box",WebkitLineClamp:2,WebkitBoxOrient:"vertical",margin:0}}>{q.text}</p>
+        <div style={{marginTop:5,display:"flex",gap:10,fontSize:11,color:"#a5b4fc",fontWeight:600}}>
+          <span>🕐 {ago(q.ts)}</span><span>👁 {q.views}</span>
+          {q.cls&&<span>📚 {q.cls}</span>}
+        </div>
+      </div>
+    </div>
+  </div>;
+}
+
+function ABubble({a}){
+  return <div style={{animation:"slideUp .3s ease",background:"linear-gradient(135deg,#f0fdf4,#dcfce7)",
+    border:"1.5px solid #86efac",borderRadius:16,padding:"13px 15px",marginTop:10}}>
+    <div style={{display:"flex",gap:9,alignItems:"center",marginBottom:9}}>
+      <Ava i={a.tName.split(" ").map(w=>w[0]).join("")} c={a.tCol||"#10b981"} s={32}/>
+      <div>
+        <div style={{fontWeight:800,fontSize:13,color:"#065f46"}}>{a.tName}</div>
+        <div style={{fontSize:10,color:"#6ee7b7"}}>{ago(a.ts)}</div>
+      </div>
+      <span style={{marginLeft:"auto",background:"#d1fae5",color:"#059669",borderRadius:99,
+        padding:"2px 9px",fontSize:11,fontWeight:700}}>👨‍🏫 Öğretmen</span>
+    </div>
+    {a.text&&<p style={{margin:0,fontSize:14,color:"#064e3b",lineHeight:1.65,
+      background:"rgba(255,255,255,.55)",borderRadius:10,padding:10}}>{a.text}</p>}
+    {a.img&&<img src={a.img} style={{marginTop:8,maxWidth:"100%",borderRadius:10}} alt="çizim"/>}
+    {a.audio&&<div style={{marginTop:8,background:"#fff",borderRadius:10,padding:8}}>
+      <div style={{fontSize:12,color:"#10b981",fontWeight:700,marginBottom:4}}>🎙 Ses Kaydı</div>
+      <audio controls src={a.audio} style={{width:"100%"}}/>
+    </div>}
+  </div>;
+}
+
+/* ── Fotoğraf butonları — WebRTC + capture fallback ── */
+function AskPhotoButtons({onFile,size="md"}){
+  const p=size==="lg"?"16px 10px":"13px 10px";
+  const fs=size==="lg"?22:20;
+
+  const handleCapture=()=>{
+    // Önce WebRTC kamerayı dene
+    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+      window.CameraManager.open((dataUrl)=>{
+        // dataUrl → File benzeri nesne
+        fetch(dataUrl).then(r=>r.blob()).then(blob=>{
+          const file=new File([blob],"photo.jpg",{type:"image/jpeg"});
+          onFile(file);
+        });
+      });
+    } else {
+      // Fallback: input capture
+      const inp=document.createElement("input");
+      inp.type="file";inp.accept="image/*";
+      inp.setAttribute("capture","environment");
+      inp.style.cssText="position:fixed;top:-999px;left:-999px;opacity:0;pointer-events:none;";
+      inp.addEventListener("change",(e)=>{
+        const f=e.target.files&&e.target.files[0];
+        if(f) onFile(f);
+        try{document.body.removeChild(inp);}catch{}
+      });
+      inp.addEventListener("cancel",()=>{try{document.body.removeChild(inp);}catch{}});
+      document.body.appendChild(inp);
+      setTimeout(()=>inp.click(),0);
+    }
+  };
+
+  const openGallery=()=>{
+    const inp=document.createElement("input");
+    inp.type="file";inp.accept="image/*";
+    inp.style.cssText="position:fixed;top:-999px;left:-999px;opacity:0;pointer-events:none;";
+    inp.addEventListener("change",(e)=>{
+      const f=e.target.files&&e.target.files[0];
+      if(f) onFile(f);
+      try{document.body.removeChild(inp);}catch{}
+    });
+    inp.addEventListener("cancel",()=>{try{document.body.removeChild(inp);}catch{}});
+    document.body.appendChild(inp);
+    setTimeout(()=>inp.click(),0);
+  };
+
+  const btnBase={flex:1,display:"flex",alignItems:"center",justifyContent:"center",
+    gap:8,padding:p,borderRadius:14,cursor:"pointer",fontWeight:700,fontSize:13,
+    transition:"all .2s",userSelect:"none",outline:"none"};
+
+  return <div style={{display:"flex",gap:8,marginBottom:8}}>
+    <button type="button"
+      style={{...btnBase,border:"2px dashed #c7d2fe",background:"#f8faff",color:"#6366f1"}}
+      onMouseEnter={e=>{e.currentTarget.style.background="#eef2ff";e.currentTarget.style.borderColor="#6366f1";}}
+      onMouseLeave={e=>{e.currentTarget.style.background="#f8faff";e.currentTarget.style.borderColor="#c7d2fe";}}
+      onClick={openGallery}>
+      <span style={{fontSize:fs}}>🖼️</span> Galeriden Seç
+    </button>
+    <button type="button"
+      style={{...btnBase,border:"2px dashed #fde68a",background:"#fffbeb",color:"#d97706"}}
+      onMouseEnter={e=>{e.currentTarget.style.background="#fef3c7";e.currentTarget.style.borderColor="#f59e0b";}}
+      onMouseLeave={e=>{e.currentTarget.style.background="#fffbeb";e.currentTarget.style.borderColor="#fde68a";}}
+      onClick={handleCapture}>
+      <span style={{fontSize:fs}}>📷</span> Fotoğraf Çek
+    </button>
+  </div>;
+}
+
+function DrawCanvas({imgUrl,onSave}){
+  const ref=useRef();
+  const[drw,setDrw]=useState(false);
+  const[col,setCol]=useState("#ef4444");
+  const[sz,setSz]=useState(3);
+  useEffect(()=>{
+    const c=ref.current;if(!c)return;
+    const ctx=c.getContext("2d");c.width=480;c.height=300;
+    if(imgUrl){const img=new Image();img.onload=()=>ctx.drawImage(img,0,0,480,300);img.src=imgUrl;}
+    else{ctx.fillStyle="#f8faff";ctx.fillRect(0,0,480,300);ctx.fillStyle="#c7d2fe";ctx.font="14px Nunito,sans-serif";ctx.textAlign="center";ctx.fillText("✏️ Çözümünüzü buraya çizin",240,150);}
+  },[imgUrl]);
+  const draw=useCallback(e=>{
+    if(!drw)return;
+    const c=ref.current;const ctx=c.getContext("2d");const r=c.getBoundingClientRect();
+    ctx.strokeStyle=col;ctx.lineWidth=sz;ctx.lineCap="round";
+    ctx.lineTo((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height));ctx.stroke();
+  },[drw,col,sz]);
+  const start=e=>{
+    const c=ref.current;const ctx=c.getContext("2d");const r=c.getBoundingClientRect();
+    ctx.beginPath();ctx.moveTo((e.clientX-r.left)*(c.width/r.width),(e.clientY-r.top)*(c.height/r.height));
+    setDrw(true);
+  };
+  const colors=["#ef4444","#3b82f6","#10b981","#f59e0b","#8b5cf6","#ec4899","#1e1b4b"];
+  return <div>
+    <div style={{display:"flex",gap:5,marginBottom:9,alignItems:"center",flexWrap:"wrap"}}>
+      {colors.map(c=><button key={c} onClick={()=>setCol(c)} style={{width:24,height:24,borderRadius:"50%",background:c,border:col===c?"3px solid #1e1b4b":"2px solid #e8eeff",cursor:"pointer"}}/>)}
+      <div style={{display:"flex",alignItems:"center",gap:5,marginLeft:6}}>
+        <span style={{fontSize:11,color:"#94a3b8"}}>Kalınlık</span>
+        <input type="range" min={1} max={10} value={sz} onChange={e=>setSz(+e.target.value)} style={{width:70}}/>
+        <span style={{fontSize:12,fontWeight:700,color:"#6366f1"}}>{sz}</span>
+      </div>
+    </div>
+    <canvas ref={ref} style={{width:"100%",border:"2px solid #e8eeff",borderRadius:14,cursor:"crosshair",touchAction:"none"}}
+      onMouseDown={start} onMouseMove={draw} onMouseUp={()=>setDrw(false)} onMouseLeave={()=>setDrw(false)}/>
+    <div style={{display:"flex",gap:8,marginTop:9}}>
+      <Btn label="💾 Kaydet" sz="sm" onClick={()=>onSave(ref.current.toDataURL("image/png"))}/>
+      <Btn label="🗑 Temizle" sz="sm" v="ghost" onClick={()=>{const c=ref.current;const ctx=c.getContext("2d");ctx.clearRect(0,0,c.width,c.height);ctx.fillStyle="#f8faff";ctx.fillRect(0,0,c.width,c.height);}}/>
+    </div>
+  </div>;
+}
+
+function AdminUserRow({u,currentUser,teachers,students,kurumKodu,onRefresh,toast_}){
+  const[editBranch,setEditBranch]=useState(false);
+  const[branches,setBranches]=useState(u.branches||[]);
+
+  const saveBranches=async()=>{
+    const updated={...u,branches};
+    await DB.upsertTeacher(updated);
+    setEditBranch(false);
+    toast_("Branşlar güncellendi ✅");
+    onRefresh();
+  };
+
+  return <div style={{borderBottom:"1px solid #f0f4ff",paddingBottom:10,marginBottom:10}}>
+    <div style={{display:"flex",alignItems:"center",gap:9,flexWrap:"wrap"}}>
+      <Ava i={u.av||u.name[0]} c={u.col||"#6366f1"} s={34} photo={u.photo}/>
+      <div style={{flex:1,minWidth:120}}>
+        <div style={{fontWeight:800,fontSize:13,color:"#1e1b4b",display:"flex",gap:5,alignItems:"center",flexWrap:"wrap"}}>
+          {u.name}
+          {u.is_admin&&<Tag label="Admin" color="#f59e0b" emoji="👑"/>}
+          <Tag label={u.role==="teacher"?"Öğretmen":"Öğrenci"} color={u.role==="teacher"?"#10b981":"#6366f1"}/>
+        </div>
+        <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>
+          {u.role==="teacher"
+            ?`${u.school||""} ${u.kurum_kodu?"· #"+u.kurum_kodu:""}`
+            :`${u.cls||""} · No: ${u.number||""}`}
+        </div>
+        {u.role==="teacher"&&!editBranch&&(
+          <div style={{display:"flex",flexWrap:"wrap",gap:4,marginTop:5}}>
+            {(u.branches||[]).map(b=><BPill key={b} branch={b}/>)}
+            {!(u.branches||[]).length&&<span style={{fontSize:11,color:"#f59e0b",fontWeight:600}}>Branş yok</span>}
+          </div>
+        )}
+        {u.role==="teacher"&&editBranch&&(
+          <div style={{marginTop:8}}>
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+              {BRANCHES.map(b=><BPill key={b} branch={b} selected={branches.includes(b)}
+                onClick={()=>setBranches(p=>p.includes(b)?p.filter(x=>x!==b):[...p,b])}/>)}
+            </div>
+            <div style={{display:"flex",gap:6}}>
+              <Btn label="💾 Kaydet" sz="sm" v="green" onClick={saveBranches}/>
+              <Btn label="İptal" sz="sm" v="ghost" onClick={()=>{setBranches(u.branches||[]);setEditBranch(false);}}/>
+            </div>
+          </div>
+        )}
+      </div>
+      <div style={{display:"flex",gap:5,flexShrink:0,flexWrap:"wrap"}}>
+        {u.role==="teacher"&&(
+          <Btn label={editBranch?"✕":"✏️ Branş"} sz="sm" v="soft" onClick={()=>setEditBranch(p=>!p)}/>
+        )}
+        {u.role==="teacher"&&!u.is_admin&&(
+          <Btn label="👑 Admin" sz="sm" v="soft" onClick={async()=>{
+            await DB.upsertTeacher({...u,is_admin:true});
+            toast_("Admin atandı 👑");onRefresh();
+          }}/>
+        )}
+        {u.role==="teacher"&&u.is_admin&&u.id!==currentUser.id&&(
+          <Btn label="Admin Al" sz="sm" v="ghost" onClick={async()=>{
+            await DB.upsertTeacher({...u,is_admin:false});
+            toast_("Admin yetkisi alındı");onRefresh();
+          }}/>
+        )}
+        {u.id!==currentUser.id&&(
+          <Btn label="🗑 Sil" sz="sm" v="danger" onClick={async()=>{
+            if(!window.confirm(`${u.name} silinsin mi?`))return;
+            if(u.role==="teacher") await DB.deleteTeacher(u.id);
+            else await DB.deleteStudent(u.id);
+            toast_("Silindi.");onRefresh();
+          }}/>
+        )}
+      </div>
+    </div>
+  </div>;
+}
+
+function PendingRow({p,schoolData,onApprove,onReject}){
+  const[selClass,setSelClass]=useState(p.cls||"");
+  const approve=()=>{
+    let u={...p,approved:true};
+    if(!p.pdf_matched&&selClass){
+      const[cls,,sNum]=selClass.split("||");
+      const clsObj=schoolData.classes.find(c=>c.name===cls);
+      const stuObj=clsObj?.students.find(s=>String(s.number)===String(sNum));
+      u={...u,cls,school:clsObj?.school||p.school,photo:stuObj?.photoData||null,pdf_matched:true};
+    }
+    onApprove(u);
+  };
+  return <div style={{padding:"11px 0",borderBottom:"1px solid #fde68a",display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-start"}}>
+    <Ava i={p.av||p.name[0]} c={p.col||"#6366f1"} s={38} photo={p.photo}/>
+    <div style={{flex:1,minWidth:160}}>
+      <div style={{fontWeight:800,fontSize:14,color:"#1e1b4b",display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+        {p.name}
+        {p.pdf_matched
+          ?<span style={{background:"#dcfce7",color:"#16a34a",borderRadius:6,padding:"2px 7px",fontSize:11,fontWeight:700}}>✅ PDF eşleşti</span>
+          :<span style={{background:"#fff1f2",color:"#e11d48",borderRadius:6,padding:"2px 7px",fontSize:11,fontWeight:700}}>⚠️ PDF'te bulunamadı</span>}
+      </div>
+      <div style={{fontSize:12,color:"#94a3b8",marginTop:2}}>No: {p.number} · {p.role==="teacher"?"Öğretmen":p.cls||"Sınıf yok"} · {ago(p.ts)} önce</div>
+      {!p.pdf_matched&&p.role!=="teacher"&&schoolData.classes.length>0&&(
+        <div style={{marginTop:7}}>
+          <div style={{fontSize:12,color:"#6366f1",fontWeight:700,marginBottom:4}}>Manuel eşleştir:</div>
+          <select value={selClass} onChange={e=>setSelClass(e.target.value)}
+            style={{padding:"6px 10px",border:"2px solid #e0e7ff",borderRadius:10,fontSize:12,background:"#fff",cursor:"pointer",fontWeight:600,color:"#475569",outline:"none"}}>
+            <option value="">— Sınıf seç —</option>
+            {schoolData.classes.map(cls=><optgroup key={cls.name} label={cls.name}>
+              {cls.students.map(s=><option key={s.number} value={`${cls.name}||${s.name}||${s.number}`}>{s.name} (No: {s.number})</option>)}
+            </optgroup>)}
+          </select>
+        </div>
+      )}
+    </div>
+    <div style={{display:"flex",gap:6,flexShrink:0}}>
+      <Btn label="✓ Onayla" sz="sm" v="green" onClick={approve}/>
+      <Btn label="✕" sz="sm" v="danger" onClick={onReject}/>
+    </div>
+  </div>;
+}
+
+function StatsView({allUsers,questions}){
+  const teachers=allUsers.filter(u=>u.role==="teacher"&&u.approved);
+  const students=allUsers.filter(u=>u.role==="student"&&u.approved);
+  const answered=questions.filter(q=>q.answers.length>0).length;
+  const topS=[...students].sort((a,b)=>(b.q_count||0)-(a.q_count||0)).slice(0,5);
+  const topT=[...teachers].sort((a,b)=>(b.solved||0)-(a.solved||0)).slice(0,5);
+  const brs=BRANCHES.map(b=>({b,c:questions.filter(q=>q.branch===b).length})).filter(x=>x.c>0).sort((a,b)=>b.c-a.c);
+  const medals=["🥇","🥈","🥉","4️⃣","5️⃣"];
+  const cards=[
+    {i:"❓",l:"Toplam Soru",v:questions.length,c:"#6366f1"},
+    {i:"✅",l:"Cevaplanan",v:answered,c:"#10b981"},
+    {i:"⏳",l:"Bekleyen",v:questions.length-answered,c:"#f59e0b"},
+    {i:"👨‍🏫",l:"Öğretmen",v:teachers.length,c:"#ec4899"},
+    {i:"🎓",l:"Öğrenci",v:students.length,c:"#8b5cf6"},
+  ];
+  return <div>
+    <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:22,fontWeight:800,color:"#312e81",marginBottom:16}}>📊 İstatistikler</div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(155px,1fr))",gap:10,marginBottom:20}}>
+      {cards.map((s,i)=><div key={s.l} style={{background:"#fff",borderRadius:18,padding:"15px 17px",border:"1.5px solid #eaedff",boxShadow:"0 3px 14px rgba(99,102,241,.07)",display:"flex",alignItems:"center",gap:11,animation:`slideUp .3s ${i*.06}s ease both`}}>
+        <div style={{width:46,height:46,borderRadius:13,background:`${s.c}18`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:21,flexShrink:0}}>{s.i}</div>
+        <div><div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:23,fontWeight:800,color:s.c,lineHeight:1}}>{s.v}</div><div style={{fontSize:11,color:"#94a3b8",fontWeight:600,marginTop:1}}>{s.l}</div></div>
+      </div>)}
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
+      <Card sx={{padding:0,overflow:"hidden"}} delay={.1}>
+        <div style={{background:"linear-gradient(135deg,#fef3c7,#fde68a)",padding:"13px 17px"}}>
+          <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#92400e"}}>🏆 En Çok Soru Soran</div>
+        </div>
+        <div style={{padding:"9px 13px"}}>
+          {topS.length===0?<div style={{padding:16,color:"#94a3b8",fontSize:13,textAlign:"center"}}>Henüz soru yok</div>
+          :topS.map((s,i)=><div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 2px",borderBottom:i<topS.length-1?"1px solid #f0f4ff":"none"}}>
+            <span style={{width:22,textAlign:"center",fontSize:16}}>{medals[i]}</span>
+            <Ava i={s.av||s.name[0]} c={s.col||"#6366f1"} s={30} photo={s.photo}/>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:"#1e1b4b"}}>{s.name}</div><div style={{fontSize:10,color:"#94a3b8"}}>{s.cls}</div></div>
+            <span style={{fontWeight:900,fontSize:17,color:"#f59e0b",fontFamily:"'Baloo 2',sans-serif"}}>{s.q_count||0}</span>
+          </div>)}
+        </div>
+      </Card>
+      <Card sx={{padding:0,overflow:"hidden"}} delay={.15}>
+        <div style={{background:"linear-gradient(135deg,#d1fae5,#a7f3d0)",padding:"13px 17px"}}>
+          <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#065f46"}}>⭐ En Çok Çözen Öğretmen</div>
+        </div>
+        <div style={{padding:"9px 13px"}}>
+          {topT.length===0?<div style={{padding:16,color:"#94a3b8",fontSize:13,textAlign:"center"}}>Henüz cevap yok</div>
+          :topT.map((t,i)=><div key={t.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 2px",borderBottom:i<topT.length-1?"1px solid #f0f4ff":"none"}}>
+            <span style={{width:22,textAlign:"center",fontSize:16}}>{medals[i]}</span>
+            <Ava i={t.av||t.name[0]} c={t.col||"#10b981"} s={30}/>
+            <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:"#1e1b4b"}}>{t.name}</div><div style={{fontSize:10,color:"#94a3b8"}}>{(t.branches||[]).join(", ")}</div></div>
+            <span style={{fontWeight:900,fontSize:17,color:"#10b981",fontFamily:"'Baloo 2',sans-serif"}}>{t.solved||0}</span>
+          </div>)}
+        </div>
+      </Card>
+      {brs.length>0&&<Card delay={.2}>
+        <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#312e81",marginBottom:12}}>📚 Branşa Göre</div>
+        {brs.map(({b,c})=>{const cl=BC[b]||"#6366f1";return <div key={b} style={{marginBottom:9}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+            <span style={{fontSize:13,fontWeight:700,color:"#475569"}}>{BE[b]} {b}</span>
+            <span style={{fontSize:13,fontWeight:900,color:cl}}>{c}</span>
+          </div>
+          <div style={{background:"#f0f4ff",borderRadius:99,height:7}}>
+            <div style={{background:`linear-gradient(90deg,${cl},${cl}88)`,borderRadius:99,height:7,
+              width:`${(c/Math.max(questions.length,1))*100}%`,transition:"width .7s ease"}}/>
+          </div>
+        </div>;})}
+      </Card>}
+    </div>
+  </div>;
+}
+
+/* ════════════════ ANA UYGULAMA ════════════════ */
+function App(){
+  const[loading,setLoading]=useState(false);
+  const[user,setUser]=useState(null);
+  const[page,setPage]=useState("login");
+
+  // Tüm veriler state'te
+  const[teachers,setTeachers]=useState([]);
+  const[students,setStudents]=useState([]);
+  const[pending,setPending]=useState([]);
+  const[questions,setQuestions]=useState([]);
+  const[notifs,setNotifs]=useState([]);
+  const[config,setConfig]=useState({school:"",kurum_kodu:""});
+  const[schoolData,setSchoolData]=useState({schoolName:"",classes:[]});
+
+  const[tab,setTab]=useState("feed");
+  const[selQ,setSelQ]=useState(null);
+  const[showAns,setShowAns]=useState(false);
+  const[showNotif,setShowNotif]=useState(false);
+  const[fBranch,setFBranch]=useState("");
+  const[fStatus,setFStatus]=useState("");
+  const[search,setSearch]=useState("");
+  const[toast,setToast]=useState(null);
+  const[toastErr,setTE]=useState(false);
+
+  // Giriş formu
+  const[loginTab,setLoginTab]=useState("student");
+  const[lName,setLName]=useState("");
+  const[lNum,setLNum]=useState("");
+  const[lTName,setLTName]=useState("");
+  const[lKK,setLKK]=useState("");
+  const[lPw,setLPw]=useState("");
+
+  // Kayıt formu
+  const[rMode,setRMode]=useState("student");
+  const[rName,setRName]=useState("");const[rSn,setRSn]=useState("");
+  const[rNum,setRNum]=useState("");
+  const[rSchool,setRSchool]=useState("");
+  const[rKK,setRKK]=useState("");
+  const[rPw,setRPw]=useState("");const[rPw2,setRPw2]=useState("");
+  const[rBranches,setRBranches]=useState([]);
+  const[rErr,setRErr]=useState("");
+
+  // Soru/cevap formu
+  const[aF,setAF]=useState({branch:"",text:"",img:null});
+  const[ansF,setAnsF]=useState({text:"",img:null,audio:null});
+  const[ansTab,setAnsTab]=useState("text");
+  const[rec,setRec]=useState(false);
+  const mrRef=useRef();const acRef=useRef([]);
+  const pdfInputRef=useRef();
+
+  const toast_=(m,err=false)=>{setToast(m);setTE(err);setTimeout(()=>setToast(null),3500);};
+
+  // Veri yükleme
+  const loadData=useCallback(async(kurumKodu,currentUser)=>{
+    if(!kurumKodu)return;
+    setLoading(true);
+    try{
+      const[ts,ss,ps,qs,cfg,sd]=await Promise.all([
+        DB.getTeachers(kurumKodu),
+        DB.getStudents(kurumKodu),
+        DB.getPending(kurumKodu),
+        DB.getQuestions(kurumKodu),
+        DB.getConfig(kurumKodu),
+        DB.getSchoolData(kurumKodu),
+      ]);
+      setTeachers(ts);setStudents(ss);setPending(ps);setQuestions(qs);
+      if(cfg)setConfig(cfg);
+      setSchoolData(sd);
+      if(currentUser){
+        const ns=await DB.getNotifs(kurumKodu,currentUser.id);
+        setNotifs(ns);
+      }
+    }catch(e){toast_("Veri yükleme hatası: "+e.message,true);}
+    setLoading(false);
+  },[]);
+
+  // Kurum kodu kontrolü — config'den gelir
+  const checkKK=(kk)=>{
+    if(!config.kurum_kodu)return true;
+    return normCmp(kk)===normCmp(config.kurum_kodu);
+  };
+
+  /* ── PDF YÜKLEYİCİ ── */
+  const handlePdfFile=async(file)=>{
+    if(!file)return;
+    const ov=document.getElementById("pdfOverlay");
+    document.getElementById("pdfTxt").textContent="PDF işleniyor...";
+    document.getElementById("pdfProg").textContent="";
+    ov.classList.add("show");
+    try{
+      const result=await window.parsePDF(file,p=>{document.getElementById("pdfProg").textContent=p;});
+      ov.classList.remove("show");
+      if(!result.classes.length){toast_("PDF'de sınıf bulunamadı! e-Okul formatında olmalı.",true);return;}
+      const total=result.classes.reduce((s,c)=>s+c.students.length,0);
+      await DB.setSchoolData(user.kurum_kodu,result);
+      if(result.schoolName){
+        await DB.setConfig(user.kurum_kodu,result.schoolName);
+        setConfig(c=>({...c,school_name:result.schoolName}));
+      }
+      setSchoolData(result);
+      toast_(`✅ ${result.classes.length} sınıf · ${total} öğrenci yüklendi!`);
+    }catch(e){
+      ov.classList.remove("show");
+      toast_("PDF hatası: "+e.message,true);
+    }
+  };
+
+  const findInPDF=(fullName,num)=>{
+    for(const cls of schoolData.classes){
+      for(const s of cls.students){
+        if(normCmp(s.name)===normCmp(fullName)&&String(s.number)===String(num)){
+          return{student:s,className:cls.name,school:cls.school};
+        }
+      }
+    }
+    return null;
+  };
+
+  /* ── AUTH: GİRİŞ ── */
+  const loginTeacher=async()=>{
+    if(!lTName||!lKK||!lPw){toast_("Tüm alanlar zorunlu!",true);return;}
+    setLoading(true);
+    // Kurum koduna göre config çek
+    const cfg=await DB.getConfig(lKK.trim());
+    if(!cfg&&lKK.trim()){
+      // İlk giriş kontrolü: pending veya teachers'da var mı?
+    }
+    const ts=await DB.getTeachers(lKK.trim());
+    const t=ts.find(t=>normCmp(t.name)===normCmp(lTName)&&normCmp(t.kurum_kodu)===normCmp(lKK));
+    setLoading(false);
+    if(!t){toast_("Öğretmen bulunamadı. Önce kayıt olun.",true);return;}
+    if(hashPw(lPw)!==t.pass_hash){toast_("Şifre hatalı! 🔒",true);return;}
+    if(!t.approved){toast_("Hesabın henüz admin onayı bekliyor ⏳",true);return;}
+    setUser({...t,role:"teacher"});
+    await loadData(lKK.trim(),t);
+    setPage("app");setTab("feed");
+    toast_(`Hoş geldin, ${t.name.split(" ")[0]}! 👋`);
+  };
+
+  const loginStudent=async()=>{
+    if(!lName||!lNum||!lPw){toast_("Tüm alanlar zorunlu!",true);return;}
+    setLoading(true);
+    // Öğrencinin kurum kodunu bilmiyoruz — tüm studentlarda ara (number+name unique olmalı)
+    // Ama önce kurum kodunu bulmamız gerekiyor: lKK alanı yok, o yüzden öğrenci giriş ekranına kurum kodu ekleyeceğiz
+    // Şimdilik lKK state'ini kullan (öğrenci giriş formuna eklendi)
+    const ss=await DB.getStudents(lKK.trim());
+    const s=ss.find(st=>normCmp(st.name)===normCmp(lName)&&String(st.number)===String(lNum.trim()));
+    setLoading(false);
+    if(!s){
+      const ps=await DB.getPending(lKK.trim());
+      const p=ps.find(st=>normCmp(st.name)===normCmp(lName)&&String(st.number)===String(lNum.trim()));
+      if(p){toast_("Kaydın admin onayı bekliyor ⏳",true);return;}
+      toast_("Öğrenci bulunamadı. Önce kayıt olun!",true);return;
+    }
+    if(hashPw(lPw)!==s.pass_hash){toast_("Şifre hatalı! 🔒",true);return;}
+    if(!s.approved){toast_("Hesabın henüz onaylanmadı ⏳",true);return;}
+    setUser({...s,role:"student"});
+    await loadData(s.kurum_kodu,s);
+    setPage("app");setTab("feed");
+    toast_(`Hoş geldin, ${s.name.split(" ")[0]}! 🎉`);
+  };
+
+  /* ── AUTH: KAYIT ── */
+  const registerTeacher=async()=>{
+    if(!rName||!rSn||!rKK||!rPw){setRErr("Tüm alanlar zorunlu ✦");return;}
+    if(rPw!==rPw2){setRErr("Şifreler eşleşmiyor");return;}
+    if(rPw.length<4){setRErr("Şifre en az 4 karakter");return;}
+    if(!rBranches.length){setRErr("En az bir branş seç ✦");return;}
+
+    setLoading(true);
+    const kk=rKK.trim();
+    const existingTs=await DB.getTeachers(kk);
+    const existingPs=await DB.getPending(kk);
+    const fullName=normName(rName+" "+rSn);
+
+    const already=[...existingTs,...existingPs].find(t=>normCmp(t.name)===normCmp(fullName));
+    if(already){setRErr("Bu isimde öğretmen zaten kayıtlı");setLoading(false);return;}
+
+    const isFirst=existingTs.length===0&&existingPs.filter(p=>p.role==="teacher").length===0;
+    const t={
+      id:uid(),role:"teacher",
+      name:fullName,
+      school:rSchool||"",
+      kurum_kodu:kk,
+      pass_hash:hashPw(rPw),
+      branches:rBranches,
+      is_admin:isFirst,
+      approved:isFirst,
+      col:COLORS[existingTs.length%COLORS.length],
+      av:(rName[0]||"")+(rSn[0]||""),
+      solved:0,
+      ts:new Date().toISOString(),
+    };
+
+    if(isFirst){
+      await DB.upsertTeacher(t);
+      await DB.setConfig(kk,rSchool||"");
+      toast_("🎉 İlk öğretmen olarak kayıt oldunuz, admin atandınız! Giriş yapabilirsiniz.");
+    }else{
+      await DB.addPending(t);
+      toast_("Kayıt isteğiniz gönderildi. Admin onayından sonra giriş yapabilirsiniz ⏳");
+    }
+    setLoading(false);
+    setPage("login");setRErr("");
+  };
+
+  const registerStudent=async()=>{
+    if(!rName||!rSn||!rNum||!rKK||!rPw){setRErr("Tüm alanlar zorunlu ✦");return;}
+    if(rPw!==rPw2){setRErr("Şifreler eşleşmiyor");return;}
+    if(rPw.length<4){setRErr("Şifre en az 4 karakter");return;}
+
+    const kk=rKK.trim();
+    setLoading(true);
+
+    // Kurum kodu geçerli mi?
+    const cfg=await DB.getConfig(kk);
+    const existingTs=await DB.getTeachers(kk);
+    if(!cfg&&existingTs.length===0){
+      setRErr("Bu kurum kodu sistemde kayıtlı değil!");setLoading(false);return;
+    }
+
+    const fullName=normName(rName+" "+rSn);
+    const num=rNum.trim();
+
+    const existingSs=await DB.getStudents(kk);
+    const existingPs=await DB.getPending(kk);
+    const already=[...existingSs,...existingPs].find(s=>normCmp(s.name)===normCmp(fullName)&&String(s.number)===String(num));
+    if(already){setRErr("Bu öğrenci zaten kayıtlı veya onay bekliyor");setLoading(false);return;}
+
+    // PDF eşleştirme
+    const sd=await DB.getSchoolData(kk);
+    let match=null;
+    for(const cls of sd.classes){
+      for(const s of cls.students){
+        if(normCmp(s.name)===normCmp(fullName)&&String(s.number)===String(num)){
+          match={student:s,className:cls.name,school:cls.school};break;
+        }
+      }
+      if(match)break;
+    }
+
+    const col=COLORS[Math.floor(Math.random()*COLORS.length)];
+    const entry={
+      id:uid(),role:"student",
+      name:fullName,number:num,
+      cls:match?.className||"",
+      school:match?.school||sd.schoolName||"",
+      kurum_kodu:kk,
+      pass_hash:hashPw(rPw),
+      col,av:(rName[0]||"")+(rSn[0]||""),
+      photo:match?.student?.photoData||null,
+      approved:false,
+      pdf_matched:!!match,
+      q_count:0,
+      ts:new Date().toISOString(),
+    };
+
+    await DB.addPending(entry);
+    setLoading(false);
+    if(match){
+      toast_("✅ Bilgilerin okul listesiyle eşleşti! Admin onayından sonra giriş yapabilirsin.");
+    }else{
+      toast_("⚠️ Bilgilerin PDF listesinde bulunamadı. Admin manuel eşleştirip onaylayacak.");
+    }
+    setPage("login");setRErr("");
+  };
+
+  /* ── SORU / CEVAP ── */
+  const askQ=async()=>{
+    if(!aF.branch||!aF.text){toast_("Branş ve soru boş olamaz!",true);return;}
+    const q={id:uid(),kurum_kodu:user.kurum_kodu,
+      sid:user.id,s_name:user.name,s_col:user.col||"#6366f1",s_photo:user.photo||null,
+      sName:user.name,sCol:user.col||"#6366f1",sPhoto:user.photo||null,
+      cls:user.cls||"",branch:aF.branch,text:aF.text,img:aF.img,
+      ts:new Date().toISOString(),answers:[],views:0};
+
+    await DB.upsertQuestion(q);
+
+    // Bildirimleri gönder
+    for(const t of teachers.filter(t=>t.branches?.includes(aF.branch)&&t.approved)){
+      await DB.addNotif({
+        id:uid(),kurum_kodu:user.kurum_kodu,user_id:t.id,
+        text:`Yeni ${aF.branch} sorusu ${BE[aF.branch]||""}`,
+        read:false,q_id:q.id,ts:new Date().toISOString()
+      });
+    }
+
+    // Öğrenci soru sayacını artır
+    await DB.upsertStudent({...user,q_count:(user.q_count||0)+1});
+    setUser(p=>({...p,q_count:(p.q_count||0)+1}));
+    setQuestions(prev=>[q,...prev]);
+    setAF({branch:"",text:"",img:null});setTab("feed");
+    toast_("Sorun havuza gönderildi! 🚀");
+  };
+
+  const answer=async()=>{
+    if(!ansF.text&&!ansF.img&&!ansF.audio){toast_("En az bir format doldur!",true);return;}
+    const a={id:uid(),tid:user.id,tName:user.name,tCol:user.col||"#10b981",
+      text:ansF.text,img:ansF.img,audio:ansF.audio,ts:new Date().toISOString()};
+    const uq={...selQ,answers:[...selQ.answers,a]};
+    await DB.upsertQuestion(uq);
+
+    // Öğrenciye bildirim
+    await DB.addNotif({
+      id:uid(),kurum_kodu:user.kurum_kodu,user_id:selQ.sid,
+      text:`${user.name} sorunuzu cevapladı! ✅`,
+      read:false,q_id:selQ.id,ts:new Date().toISOString()
+    });
+
+    // Öğretmen çözüm sayacı
+    const updT={...user,solved:(user.solved||0)+1};
+    await DB.upsertTeacher(updT);
+    setUser(p=>({...p,solved:(p.solved||0)+1}));
+    setSelQ(uq);
+    setQuestions(prev=>prev.map(q=>q.id===selQ.id?uq:q));
+    setAnsF({text:"",img:null,audio:null});setShowAns(false);
+    toast_("Cevabın öğrenciye ulaştı! ✨");
+  };
+
+  const openQ=async(q)=>{
+    const uq={...q,views:q.views+1};
+    setSelQ(uq);
+    setQuestions(prev=>prev.map(x=>x.id===q.id?uq:x));
+    await DB.upsertQuestion(uq);
+  };
+
+  const startRec=async()=>{
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({audio:true});
+      const mr=new MediaRecorder(s);mrRef.current=mr;acRef.current=[];
+      mr.ondataavailable=e=>acRef.current.push(e.data);
+      mr.onstop=()=>{const url=URL.createObjectURL(new Blob(acRef.current,{type:"audio/webm"}));setAnsF(p=>({...p,audio:url}));s.getTracks().forEach(t=>t.stop());};
+      mr.start();setRec(true);
+    }catch{toast_("Mikrofon erişimi reddedildi!",true);}
+  };
+  const stopRec=()=>{mrRef.current?.stop();setRec(false);};
+
+  const imgUpFile=(f,t)=>{if(!f)return;const r=new FileReader();r.onload=ev=>{if(t==="ask")setAF(p=>({...p,img:ev.target.result}));else setAnsF(p=>({...p,img:ev.target.result}));};r.readAsDataURL(f);};
+
+  const isT=user?.role==="teacher";
+  const myBr=user?.branches||[];
+  const allUsers=[...teachers,...students];
+
+  // Normalize questions for display (support both old and new field names)
+  const normQs=questions.map(q=>({
+    ...q,
+    sName:q.sName||q.s_name||"",
+    sCol:q.sCol||q.s_col||"#6366f1",
+    sPhoto:q.sPhoto||q.s_photo||null,
+  }));
+
+  const filtQ=normQs.filter(q=>{
+    if(tab==="mine"&&isT&&!myBr.includes(q.branch))return false;
+    if(tab==="mine"&&!isT&&q.sid!==user?.id)return false;
+    if(fBranch&&q.branch!==fBranch)return false;
+    if(fStatus==="answered"&&q.answers.length===0)return false;
+    if(fStatus==="pending"&&q.answers.length>0)return false;
+    if(search&&!q.text.toLowerCase().includes(search.toLowerCase())&&!q.sName.toLowerCase().includes(search.toLowerCase()))return false;
+    return true;
+  });
+
+  const unread=notifs.filter(n=>!n.read).length;
+  const tabs=isT
+    ?[{id:"feed",l:"🏠 Akış"},{id:"mine",l:"📌 Branşım"},{id:"stats",l:"📊 İstatistik"},...(user?.is_admin?[{id:"admin",l:"⚙️ Yönetim"}]:[])]
+    :[{id:"feed",l:"🏠 Akış"},{id:"ask",l:"❓ Soru Sor"},{id:"mine",l:"📌 Sorularım"},{id:"stats",l:"📊 İstatistik"}];
+
+  const Toast=()=>toast?<div style={{position:"fixed",bottom:22,left:"50%",transform:"translateX(-50%)",
+    background:toastErr?"linear-gradient(135deg,#ef4444,#f43f5e)":"linear-gradient(135deg,#10b981,#059669)",
+    color:"#fff",padding:"12px 24px",borderRadius:14,fontWeight:700,
+    boxShadow:"0 10px 32px rgba(0,0,0,.18)",zIndex:9999,animation:"pop .3s ease",
+    fontSize:14,maxWidth:"90vw",textAlign:"center",border:"1.5px solid rgba(255,255,255,.25)"}}>{toast}</div>:null;
+
+  const LoadingOverlay=()=>loading?<div style={{position:"fixed",inset:0,background:"rgba(17,24,80,.35)",
+    zIndex:5000,display:"flex",alignItems:"center",justifyContent:"center",backdropFilter:"blur(4px)"}}>
+    <div style={{background:"#fff",borderRadius:20,padding:"28px 36px",textAlign:"center",
+      boxShadow:"0 20px 60px rgba(99,102,241,.25)"}}>
+      <div style={{width:40,height:40,border:"4px solid #e0e7ff",borderTopColor:"#6366f1",
+        borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 14px"}}/>
+      <div style={{fontWeight:700,color:"#4338ca",fontSize:14}}>Yükleniyor...</div>
+    </div>
+  </div>:null;
+
+  /* ════ GİRİŞ EKRANI ════ */
+  if(page==="login") return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#e0e7ff 0%,#f5f3ff 50%,#fce7f3 100%)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{position:"fixed",top:-100,right:-80,width:360,height:360,background:"radial-gradient(circle,#a5b4fc33,transparent 70%)",borderRadius:"50%",pointerEvents:"none"}}/>
+      <div style={{position:"fixed",bottom:-80,left:-60,width:320,height:320,background:"radial-gradient(circle,#fbcfe833,transparent 70%)",borderRadius:"50%",pointerEvents:"none"}}/>
+      <div style={{background:"rgba(255,255,255,.93)",backdropFilter:"blur(22px)",borderRadius:28,
+        padding:"30px 32px 26px",width:"100%",maxWidth:440,
+        boxShadow:"0 24px 64px rgba(99,102,241,.17)",border:"1.5px solid rgba(255,255,255,.9)",
+        animation:"pop .38s ease",position:"relative",zIndex:1}}>
+        <div style={{textAlign:"center",marginBottom:22}}>
+          <div style={{fontSize:56,animation:"float 3s ease-in-out infinite",display:"inline-block"}}>📚</div>
+          <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:34,fontWeight:800,
+            background:"linear-gradient(135deg,#4f46e5 30%,#ec4899 90%)",
+            WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",lineHeight:1.1,marginTop:4}}>SORU SOR</div>
+          <p style={{margin:"5px 0 0",color:"#94a3b8",fontSize:13,fontWeight:600}}>Okul İçi Soru-Cevap Platformu</p>
+        </div>
+
+        <div style={{display:"flex",gap:4,marginBottom:18,background:"#f0f4ff",borderRadius:13,padding:3}}>
+          {[{v:"student",l:"🎓 Öğrenci"},{v:"teacher",l:"👨‍🏫 Öğretmen"}].map(r=>(
+            <button key={r.v} onClick={()=>setLoginTab(r.v)}
+              style={{flex:1,padding:"8px 0",borderRadius:10,cursor:"pointer",fontWeight:800,border:"none",
+                background:loginTab===r.v?"#fff":"transparent",color:loginTab===r.v?"#6366f1":"#94a3b8",
+                boxShadow:loginTab===r.v?"0 2px 10px rgba(99,102,241,.14)":"none",transition:"all .2s",fontSize:14}}>
+              {r.l}
+            </button>
+          ))}
+        </div>
+
+        {loginTab==="teacher"?(
+          <>
+            <Inp label="Ad Soyad" value={lTName} onChange={e=>setLTName(e.target.value)} placeholder="Adınız ve soyadınız" icon="👤" required onKeyDown={e=>e.key==="Enter"&&loginTeacher()}/>
+            <Inp label="Kurum Kodu" value={lKK} onChange={e=>setLKK(e.target.value)} placeholder="Okulun kurum kodu" icon="🏫" required onKeyDown={e=>e.key==="Enter"&&loginTeacher()}/>
+            <Inp label="Şifre" type="password" value={lPw} onChange={e=>setLPw(e.target.value)} placeholder="••••••" icon="🔒" required onKeyDown={e=>e.key==="Enter"&&loginTeacher()}/>
+            <Btn label="Giriş Yap 🚀" onClick={loginTeacher} full sz="lg" sx={{marginBottom:12}}/>
+          </>
+        ):(
+          <>
+            <Inp label="Ad Soyad" value={lName} onChange={e=>setLName(e.target.value)} placeholder="Adın ve soyadın" icon="👤" required onKeyDown={e=>e.key==="Enter"&&loginStudent()}/>
+            <Inp label="Kurum Kodu" value={lKK} onChange={e=>setLKK(e.target.value)} placeholder="Okulunun kurum kodu" icon="🏫" required onKeyDown={e=>e.key==="Enter"&&loginStudent()}/>
+            <Inp label="Öğrenci Numarası" value={lNum} onChange={e=>setLNum(e.target.value)} placeholder="Okul numaran" icon="🪪" required onKeyDown={e=>e.key==="Enter"&&loginStudent()}/>
+            <Inp label="Şifre" type="password" value={lPw} onChange={e=>setLPw(e.target.value)} placeholder="••••" icon="🔒" required onKeyDown={e=>e.key==="Enter"&&loginStudent()}/>
+            <Btn label="Giriş Yap 🚀" onClick={loginStudent} full sz="lg" sx={{marginBottom:12}}/>
+          </>
+        )}
+
+        <div style={{textAlign:"center",fontSize:13,color:"#94a3b8"}}>
+          Hesabın yok mu?{" "}
+          <button onClick={()=>{setPage("register");setRErr("");setRMode("student");}}
+            style={{background:"none",border:"none",color:"#6366f1",fontWeight:800,cursor:"pointer",fontSize:13}}>
+            Kayıt Ol ✦
+          </button>
+        </div>
+        <div style={{marginTop:14,background:"#eef2ff",border:"1.5px solid #c7d2fe",borderRadius:12,
+          padding:10,fontSize:11,color:"#6366f1",fontWeight:600,lineHeight:1.6,textAlign:"center"}}>
+          🌐 Her okul kendi kurum koduyla sisteme giriş yapar
+        </div>
+      </div>
+      <Toast/><LoadingOverlay/>
+    </div>
+  );
+
+  /* ════ KAYIT EKRANI ════ */
+  if(page==="register") return(
+    <div style={{minHeight:"100vh",background:"linear-gradient(160deg,#e0e7ff,#f5f3ff,#fce7f3)",
+      display:"flex",alignItems:"center",justifyContent:"center",padding:16}}>
+      <div style={{background:"rgba(255,255,255,.93)",backdropFilter:"blur(22px)",borderRadius:28,
+        padding:"28px 30px 24px",width:"100%",maxWidth:520,
+        boxShadow:"0 24px 64px rgba(99,102,241,.17)",animation:"pop .35s ease",
+        maxHeight:"93vh",overflow:"auto",border:"1.5px solid rgba(255,255,255,.9)"}}>
+        <div style={{textAlign:"center",marginBottom:18}}>
+          <div style={{fontSize:44,animation:"bounceY 2s ease-in-out infinite",display:"inline-block"}}>📝</div>
+          <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:22,fontWeight:800,color:"#312e81",marginTop:4}}>Hesap Oluştur</div>
+        </div>
+
+        <div style={{display:"flex",gap:4,marginBottom:18,background:"#f0f4ff",borderRadius:13,padding:3}}>
+          {[{v:"student",l:"🎓 Öğrenci"},{v:"teacher",l:"👨‍🏫 Öğretmen"}].map(r=>(
+            <button key={r.v} onClick={()=>{setRMode(r.v);setRErr("");}}
+              style={{flex:1,padding:"8px 0",borderRadius:10,cursor:"pointer",fontWeight:800,border:"none",
+                background:rMode===r.v?"#fff":"transparent",color:rMode===r.v?"#6366f1":"#94a3b8",
+                boxShadow:rMode===r.v?"0 2px 10px rgba(99,102,241,.14)":"none",transition:"all .2s",fontSize:14}}>
+              {r.l}
+            </button>
+          ))}
+        </div>
+
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}}>
+          <Inp label="Ad" value={rName} onChange={e=>setRName(e.target.value)} required/>
+          <Inp label="Soyad" value={rSn} onChange={e=>setRSn(e.target.value)} required/>
+        </div>
+
+        {rMode==="student"&&(
+          <Inp label="Öğrenci Numarası" value={rNum} onChange={e=>setRNum(e.target.value)}
+            placeholder="e-Okul'daki numaran" icon="🪪" required/>
+        )}
+        {rMode==="teacher"&&(
+          <Inp label="Okul Adı" value={rSchool} onChange={e=>setRSchool(e.target.value)}
+            placeholder="Örn: Atatürk Ortaokulu" icon="🏫"/>
+        )}
+
+        <Inp label="Kurum Kodu" value={rKK} onChange={e=>setRKK(e.target.value)}
+          placeholder="Okulunuzun kurum kodu" icon="🔑" required/>
+
+        <div style={{marginTop:-8,marginBottom:13,fontSize:11,color:"#6366f1",fontWeight:700,
+          background:"#eef2ff",borderRadius:8,padding:"5px 9px"}}>
+          ℹ️ {rMode==="student"
+            ?"Ad, soyad ve numaran e-Okul PDF listesiyle birebir eşleşmelidir"
+            :"İlk öğretmen kayıt olunca kurum kodu sisteme kilitlenir"}
+        </div>
+
+        <Inp label="Şifre" type="password" value={rPw} onChange={e=>setRPw(e.target.value)} icon="🔒" required/>
+        <Inp label="Şifre Tekrar" type="password" value={rPw2} onChange={e=>setRPw2(e.target.value)} icon="🔑" required/>
+
+        {rMode==="teacher"&&(
+          <div style={{marginBottom:14}}>
+            <label style={{display:"block",marginBottom:7,fontSize:13,fontWeight:700,color:"#4338ca"}}>
+              Branşlarınız <span style={{color:"#ec4899"}}>✦</span>
+            </label>
+            <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+              {BRANCHES.map(b=><BPill key={b} branch={b} selected={rBranches.includes(b)}
+                onClick={()=>setRBranches(p=>p.includes(b)?p.filter(x=>x!==b):[...p,b])}/>)}
+            </div>
+          </div>
+        )}
+
+        {rErr&&<div style={{background:"#fff1f2",border:"1.5px solid #fecdd3",borderRadius:12,
+          padding:10,marginBottom:11,color:"#e11d48",fontSize:13,fontWeight:600}}>❌ {rErr}</div>}
+
+        <Btn label="Kayıt Ol 🎉" onClick={rMode==="teacher"?registerTeacher:registerStudent}
+          full sz="lg" sx={{marginBottom:12}}/>
+        <div style={{textAlign:"center",fontSize:13,color:"#94a3b8"}}>
+          Zaten hesabın var mı?{" "}
+          <button onClick={()=>setPage("login")}
+            style={{background:"none",border:"none",color:"#6366f1",fontWeight:800,cursor:"pointer",fontSize:13}}>
+            Giriş Yap
+          </button>
+        </div>
+      </div>
+      <Toast/><LoadingOverlay/>
+    </div>
+  );
+
+  /* ════ ANA UYGULAMA ════ */
+  return(
+    <div style={{minHeight:"100vh",background:"#f0f4ff"}}>
+      <header style={{background:"linear-gradient(135deg,#1e1b4b,#4338ca 55%,#7c3aed)",
+        boxShadow:"0 4px 28px rgba(67,56,202,.35)",position:"sticky",top:0,zIndex:200,overflow:"hidden"}}>
+        <div style={{position:"absolute",top:-30,right:60,width:130,height:130,
+          background:"rgba(255,255,255,.07)",borderRadius:"50%",pointerEvents:"none"}}/>
+        <div style={{maxWidth:1160,margin:"0 auto",padding:"0 14px",display:"flex",alignItems:"center",gap:10,height:60}}>
+          <div style={{display:"flex",alignItems:"center",gap:9,flex:1,minWidth:0}}>
+            <span style={{fontSize:26,animation:"float 3s ease-in-out infinite",display:"inline-block",flexShrink:0}}>📚</span>
+            <div style={{minWidth:0}}>
+              <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:17,color:"#fff",lineHeight:1.1}}>SORU SOR</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,.5)",letterSpacing:.6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                {config.school_name||config.school||"Okul İçi Q&A"}{user?.kurum_kodu&&` · #${user.kurum_kodu}`}
+              </div>
+            </div>
+          </div>
+          <nav style={{display:"flex",gap:2,overflowX:"auto",flexShrink:0}}>
+            {tabs.map(t=>(
+              <button key={t.id} onClick={()=>{setTab(t.id);if(t.id!=="feed"&&t.id!=="mine")setSelQ(null);}}
+                style={{padding:"6px 12px",borderRadius:11,border:"none",cursor:"pointer",
+                  background:tab===t.id?"rgba(255,255,255,.2)":"transparent",
+                  color:tab===t.id?"#fff":"rgba(255,255,255,.7)",
+                  fontSize:12,fontWeight:tab===t.id?800:600,whiteSpace:"nowrap",transition:"all .2s",position:"relative"}}>
+                {t.l}
+                {tab===t.id&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",
+                  width:4,height:4,borderRadius:"50%",background:"#fff"}}/>}
+              </button>
+            ))}
+          </nav>
+          <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
+            {isT&&<button onClick={()=>setShowNotif(true)}
+              style={{position:"relative",background:"rgba(255,255,255,.12)",border:"none",borderRadius:11,
+                width:37,height:37,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.22)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.12)"}>
+              🔔{unread>0&&<div style={{position:"absolute",top:3,right:3,background:"linear-gradient(135deg,#ec4899,#f43f5e)",
+                color:"#fff",borderRadius:"50%",width:15,height:15,fontSize:9,fontWeight:800,
+                display:"flex",alignItems:"center",justifyContent:"center",animation:"pulseR 2s ease infinite"}}>{unread}</div>}
+            </button>}
+            <div style={{display:"flex",alignItems:"center",gap:7,background:"rgba(255,255,255,.12)",borderRadius:12,padding:"5px 10px"}}>
+              <Ava i={user?.av||user?.name?.[0]} c={user?.col||"#6366f1"} s={27} photo={user?.photo}/>
+              <span style={{fontSize:12,color:"rgba(255,255,255,.85)",fontWeight:700,maxWidth:70,
+                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.name?.split(" ")[0]}</span>
+            </div>
+            <button onClick={()=>{setUser(null);setPage("login");setLName("");setLNum("");setLTName("");setLKK("");setLPw("");}}
+              style={{background:"rgba(255,255,255,.1)",border:"1.5px solid rgba(255,255,255,.18)",
+                borderRadius:10,padding:"5px 11px",cursor:"pointer",color:"rgba(255,255,255,.75)",
+                fontSize:11,fontWeight:700,transition:"all .2s"}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.2)"}
+              onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.1)"}>Çıkış</button>
+          </div>
+        </div>
+      </header>
+
+      <main style={{maxWidth:1160,margin:"0 auto",padding:"22px 14px"}}>
+
+        {tab==="stats"&&<StatsView allUsers={allUsers} questions={questions}/>}
+
+        {tab==="ask"&&!isT&&(
+          <div style={{maxWidth:570,margin:"0 auto",animation:"slideUp .3s ease"}}>
+            <Card sx={{border:"2px solid #e0e7ff"}}>
+              <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:22,fontWeight:800,color:"#312e81",marginBottom:4}}>❓ Yeni Soru Sor</div>
+              <p style={{color:"#a5b4fc",fontSize:14,marginBottom:18,fontWeight:600}}>Branşı seç, soruyu yaz, gönder! 🚀</p>
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",marginBottom:7,fontSize:13,fontWeight:700,color:"#4338ca"}}>Ders Branşı <span style={{color:"#ec4899"}}>✦</span></label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                  {BRANCHES.map(b=><BPill key={b} branch={b} selected={aF.branch===b} onClick={()=>setAF(f=>({...f,branch:f.branch===b?"":b}))}/>)}
+                </div>
+              </div>
+              <div style={{marginBottom:14}}>
+                <label style={{display:"block",marginBottom:6,fontSize:13,fontWeight:700,color:"#4338ca"}}>Sorunuz <span style={{color:"#ec4899"}}>✦</span></label>
+                <textarea value={aF.text} onChange={e=>setAF(f=>({...f,text:e.target.value}))} placeholder="Sorunuzu açık yazın..." rows={4}
+                  style={{width:"100%",padding:"12px 13px",border:"2px solid #e8eeff",borderRadius:13,fontSize:14,resize:"vertical",
+                    outline:"none",color:"#1e1b4b",background:"#f8faff",boxSizing:"border-box",transition:"border .18s"}}
+                  onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#e8eeff"}/>
+              </div>
+              <div style={{marginBottom:20}}>
+                <label style={{display:"block",marginBottom:6,fontSize:13,fontWeight:700,color:"#4338ca"}}>📷 Fotoğraf <span style={{color:"#94a3b8",fontWeight:600}}>(isteğe bağlı)</span></label>
+                <AskPhotoButtons onFile={f=>imgUpFile(f,"ask")}/>
+                {aF.img&&<div style={{marginTop:8,position:"relative",display:"inline-block"}}>
+                  <img src={aF.img} style={{maxWidth:"100%",maxHeight:160,borderRadius:10,border:"2px solid #c7d2fe"}} alt=""/>
+                  <button onClick={()=>setAF(f=>({...f,img:null}))} style={{position:"absolute",top:5,right:5,
+                    background:"#ef4444",color:"#fff",border:"none",borderRadius:"50%",width:22,height:22,cursor:"pointer",fontSize:11}}>✕</button>
+                </div>}
+              </div>
+              <Btn label="📤 Soruyu Havuza Gönder" onClick={askQ} full sz="lg" v="pink"/>
+            </Card>
+          </div>
+        )}
+
+        {tab==="admin"&&user?.is_admin&&(
+          <div style={{animation:"slideUp .3s ease"}}>
+            <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:22,fontWeight:800,color:"#312e81",marginBottom:18}}>⚙️ Yönetim Paneli</div>
+
+            <Card sx={{marginBottom:14,border:"2px solid #e0e7ff",background:"linear-gradient(135deg,#fafbff,#eef2ff)"}}>
+              <div style={{display:"flex",alignItems:"flex-start",gap:14,flexWrap:"wrap"}}>
+                <div style={{flex:1,minWidth:200}}>
+                  <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#312e81",marginBottom:4}}>
+                    📄 e-Okul Sınıf Listesi (PDF)
+                  </div>
+                  {schoolData.classes.length>0
+                    ?<div style={{fontSize:13,color:"#10b981",fontWeight:600}}>
+                      ✅ {schoolData.schoolName} · {schoolData.classes.length} sınıf · {schoolData.classes.reduce((s,c)=>s+c.students.length,0)} öğrenci
+                    </div>
+                    :<div style={{fontSize:13,color:"#f59e0b",fontWeight:600}}>⚠️ Henüz yüklenmedi</div>}
+                </div>
+                <div>
+                  <input ref={pdfInputRef} type="file" accept=".pdf" style={{display:"none"}}
+                    onChange={e=>{const f=e.target.files[0];if(f){handlePdfFile(f);}e.target.value="";}}/>
+                  <Btn label="📄 PDF Yükle" sz="sm" onClick={()=>pdfInputRef.current?.click()}/>
+                </div>
+              </div>
+              {schoolData.classes.length>0&&(
+                <div style={{marginTop:12,display:"flex",flexWrap:"wrap",gap:6}}>
+                  {schoolData.classes.map(cls=>(
+                    <div key={cls.name} style={{background:"#fff",border:"1.5px solid #e0e7ff",
+                      borderRadius:10,padding:"5px 11px",fontSize:12,fontWeight:700,color:"#4338ca"}}>
+                      📚 {cls.name} <span style={{color:"#94a3b8",fontWeight:600}}>({cls.students.length})</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            {pending.length>0&&(
+              <Card sx={{marginBottom:14,border:"2px solid #fde68a",background:"linear-gradient(135deg,#fffbeb,#fefce8)"}}>
+                <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:13}}>
+                  <span style={{fontSize:18}}>⏳</span>
+                  <span style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#92400e"}}>
+                    Onay Bekleyenler ({pending.length})
+                  </span>
+                </div>
+                {pending.map(p=>(
+                  <PendingRow key={p.id} p={p} schoolData={schoolData}
+                    onApprove={async(updP)=>{
+                      await DB.deletePending(updP.id);
+                      if(updP.role==="teacher") await DB.upsertTeacher(updP);
+                      else await DB.upsertStudent(updP);
+                      await loadData(user.kurum_kodu,user);
+                      toast_(`${p.name} onaylandı! ✅`);
+                    }}
+                    onReject={async()=>{
+                      await DB.deletePending(p.id);
+                      await loadData(user.kurum_kodu,user);
+                      toast_("Reddedildi.");
+                    }}
+                  />
+                ))}
+              </Card>
+            )}
+
+            <Card sx={{marginBottom:14}}>
+              <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#312e81",marginBottom:13}}>
+                👥 Aktif Kullanıcılar ({teachers.filter(t=>t.approved).length+students.filter(s=>s.approved).length})
+              </div>
+              {[...teachers.filter(t=>t.approved),...students.filter(s=>s.approved)].map(u=>(
+                <AdminUserRow key={u.id} u={u} currentUser={user}
+                  teachers={teachers} students={students}
+                  kurumKodu={user.kurum_kodu}
+                  onRefresh={()=>loadData(user.kurum_kodu,user)}
+                  toast_={toast_}/>
+              ))}
+            </Card>
+
+            <Card>
+              <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#312e81",marginBottom:13}}>⚙️ Sistem</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:10}}>
+                <div style={{background:"#eef2ff",borderRadius:12,padding:"10px 14px",fontSize:13,fontWeight:700,color:"#4338ca",flex:1,minWidth:160}}>
+                  🏫 {config.school_name||config.school||"Okul adı yok"}
+                </div>
+                <div style={{background:"#f0fdf4",borderRadius:12,padding:"10px 14px",fontSize:13,fontWeight:700,color:"#16a34a",flex:1,minWidth:160}}>
+                  🔑 Kurum Kodu: {user.kurum_kodu||"—"}
+                </div>
+                <Btn label="🔄 Yenile" sz="sm" v="soft" onClick={()=>loadData(user.kurum_kodu,user)}/>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {(tab==="feed"||tab==="mine")&&(
+          <div style={{display:"grid",gridTemplateColumns:selQ?"minmax(260px,1fr) minmax(260px,1.1fr)":"1fr",gap:14,alignItems:"start"}}>
+            <div style={{animation:"slideUp .28s ease"}}>
+              <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:13,flexWrap:"wrap"}}>
+                <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:20,fontWeight:800,color:"#312e81"}}>
+                  {tab==="mine"&&isT?"📌 Branşım":tab==="mine"?"📌 Sorularım":"🌊 Soru Havuzu"}
+                </div>
+                <div style={{background:"linear-gradient(135deg,#ede9fe,#e0e7ff)",color:"#6366f1",borderRadius:99,
+                  padding:"3px 11px",fontSize:13,fontWeight:800}}>{filtQ.length}</div>
+                {!isT&&<Btn label="+ Soru Sor" sz="sm" v="pink" onClick={()=>setTab("ask")} sx={{marginLeft:"auto"}}/>}
+                <Btn label="🔄" sz="sm" v="soft" onClick={()=>loadData(user.kurum_kodu,user)} sx={{marginLeft:isT?"auto":"0"}}/>
+              </div>
+              <div style={{display:"flex",gap:7,marginBottom:12,flexWrap:"wrap"}}>
+                <div style={{position:"relative",flex:1,minWidth:130}}>
+                  <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",fontSize:13,pointerEvents:"none"}}>🔍</span>
+                  <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ara..."
+                    style={{width:"100%",padding:"8px 11px 8px 32px",border:"2px solid #e8eeff",borderRadius:12,
+                      fontSize:13,outline:"none",color:"#1e1b4b",background:"#fff",boxSizing:"border-box",fontWeight:600}}
+                    onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#e8eeff"}/>
+                </div>
+                <select value={fBranch} onChange={e=>setFBranch(e.target.value)}
+                  style={{padding:"8px 11px",border:"2px solid #e8eeff",borderRadius:12,fontSize:12,
+                    background:"#fff",cursor:"pointer",fontWeight:700,color:"#475569",outline:"none"}}>
+                  <option value="">Tüm Branşlar</option>
+                  {BRANCHES.map(b=><option key={b} value={b}>{BE[b]} {b}</option>)}
+                </select>
+                <select value={fStatus} onChange={e=>setFStatus(e.target.value)}
+                  style={{padding:"8px 11px",border:"2px solid #e8eeff",borderRadius:12,fontSize:12,
+                    background:"#fff",cursor:"pointer",fontWeight:700,color:"#475569",outline:"none"}}>
+                  <option value="">Tüm Durum</option>
+                  <option value="pending">⏳ Bekleyen</option>
+                  <option value="answered">✅ Cevaplanan</option>
+                </select>
+              </div>
+              <div style={{maxHeight:"calc(100vh - 240px)",overflowY:"auto",paddingRight:3}}>
+                {filtQ.length===0
+                  ?<div style={{textAlign:"center",padding:"36px 20px",color:"#c7d2fe"}}>
+                    <div style={{fontSize:50,marginBottom:10,animation:"float 3s ease-in-out infinite",display:"inline-block"}}>🔍</div>
+                    <div style={{fontWeight:800,fontSize:15,color:"#a5b4fc"}}>Soru bulunamadı</div>
+                    <div style={{fontSize:13,marginTop:4}}>Filtreni değiştir veya yeni soru sor!</div>
+                  </div>
+                  :filtQ.map(q=><QCard key={q.id} q={q} sel={selQ?.id===q.id} onClick={openQ}/>)}
+              </div>
+            </div>
+
+            {selQ&&(
+              <div style={{background:"#fff",borderRadius:22,border:"2px solid #e0e7ff",
+                boxShadow:"0 8px 36px rgba(99,102,241,.11)",maxHeight:"calc(100vh - 125px)",
+                display:"flex",flexDirection:"column",animation:"pop .22s ease",position:"sticky",top:74}}>
+                <div style={{background:`linear-gradient(135deg,${BC[selQ.branch]||"#6366f1"}20,${BC[selQ.branch]||"#6366f1"}06)`,
+                  padding:"14px 18px",borderBottom:"1.5px solid #e8eeff",display:"flex",alignItems:"center",
+                  justifyContent:"space-between",gap:8,flexWrap:"wrap",borderRadius:"20px 20px 0 0",flexShrink:0}}>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                    <BPill branch={selQ.branch}/>
+                    {selQ.answers.length===0
+                      ?<Tag label="Bekliyor" color="#f59e0b" emoji="⏳"/>
+                      :<Tag label={`${selQ.answers.length} Cevap`} color="#10b981" emoji="✅"/>}
+                    {selQ.cls&&<Tag label={selQ.cls} color="#6366f1" emoji="📚"/>}
+                  </div>
+                  <button onClick={()=>setSelQ(null)} style={{background:"#f0f4ff",border:"none",borderRadius:9,
+                    width:28,height:28,cursor:"pointer",color:"#6366f1",fontWeight:800,fontSize:13,
+                    display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+                </div>
+                <div style={{padding:18,overflowY:"auto",flex:1}}>
+                  <div style={{display:"flex",gap:9,alignItems:"center",marginBottom:12}}>
+                    <Ava i={selQ.sName.split(" ").map(w=>w[0]).join("")} c={selQ.sCol||"#6366f1"} s={38} ring photo={selQ.sPhoto}/>
+                    <div>
+                      <div style={{fontWeight:800,fontSize:14,color:"#1e1b4b"}}>{selQ.sName}</div>
+                      <div style={{fontSize:11,color:"#a5b4fc",fontWeight:600}}>🕐 {ago(selQ.ts)} · 👁 {selQ.views}</div>
+                    </div>
+                  </div>
+                  <div style={{background:"linear-gradient(135deg,#f8faff,#eef2ff)",borderRadius:14,
+                    padding:14,marginBottom:14,border:"1.5px solid #e0e7ff"}}>
+                    <p style={{margin:0,fontSize:14,color:"#1e1b4b",lineHeight:1.7}}>{selQ.text}</p>
+                  </div>
+                  {selQ.img&&<img src={selQ.img} style={{maxWidth:"100%",borderRadius:12,border:"2px solid #e0e7ff",marginBottom:14}} alt=""/>}
+                  <div style={{fontWeight:800,fontSize:14,color:"#312e81",marginBottom:8}}>💡 Cevaplar ({selQ.answers.length})</div>
+                  {selQ.answers.length===0&&(
+                    <div style={{textAlign:"center",padding:18,background:"#f8faff",borderRadius:14,color:"#a5b4fc"}}>
+                      <div style={{fontSize:34,animation:"float 3s ease-in-out infinite",display:"inline-block",marginBottom:5}}>💭</div>
+                      <div style={{fontWeight:700,fontSize:13}}>Henüz cevap yok</div>
+                    </div>
+                  )}
+                  {selQ.answers.map(a=><ABubble key={a.id} a={a}/>)}
+                  {isT&&(user?.is_admin||myBr.includes(selQ.branch)||tab==="feed")&&(
+                    <Btn label="✏️ Cevap Ver" onClick={()=>setShowAns(true)} full sz="lg" v="green" sx={{marginTop:14}}/>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* BİLDİRİMLER */}
+      <Modal open={showNotif} onClose={()=>setShowNotif(false)} title="🔔 Bildirimler" w={400}>
+        {notifs.length===0
+          ?<div style={{textAlign:"center",padding:20,color:"#c7d2fe"}}>
+            <div style={{fontSize:46,marginBottom:8,animation:"float 3s ease-in-out infinite",display:"inline-block"}}>🔕</div>
+            <div style={{fontWeight:700}}>Bildirim yok</div>
+          </div>
+          :notifs.map(n=>(
+            <div key={n.id} onClick={async()=>{
+              const q=questions.find(q=>q.id===n.q_id);
+              if(q){openQ(q);setTab("mine");}
+              await DB.markNotifRead(n.id);
+              setNotifs(prev=>prev.map(x=>x.id===n.id?{...x,read:true}:x));
+              setShowNotif(false);
+            }}
+              style={{padding:"11px 13px",borderRadius:13,marginBottom:7,
+                background:n.read?"#f8faff":"linear-gradient(135deg,#eef2ff,#f5f3ff)",
+                border:`1.5px solid ${n.read?"#f0f4ff":"#c4b5fd"}`,cursor:"pointer",transition:"all .2s"}}
+              onMouseEnter={e=>e.currentTarget.style.transform="translateX(4px)"}
+              onMouseLeave={e=>e.currentTarget.style.transform="none"}>
+              <div style={{fontWeight:700,fontSize:13,color:"#312e81"}}>{n.text}</div>
+              <div style={{fontSize:11,color:"#a5b4fc",marginTop:2,fontWeight:600}}>🕐 {ago(n.ts)}</div>
+            </div>
+          ))}
+      </Modal>
+
+      {/* CEVAP VER */}
+      <Modal open={showAns} onClose={()=>setShowAns(false)} title="✏️ Cevap Ver" w={580}>
+        <div style={{display:"flex",gap:5,marginBottom:15,background:"#f0f4ff",borderRadius:13,padding:4}}>
+          {[{id:"text",l:"📝 Yazı"},{id:"photo",l:"📷 Fotoğraf"},{id:"draw",l:"🎨 Çizim"},{id:"audio",l:"🎙 Ses"}].map(t=>(
+            <button key={t.id} onClick={()=>setAnsTab(t.id)}
+              style={{flex:1,padding:8,borderRadius:10,border:"none",
+                background:ansTab===t.id?"#fff":"transparent",
+                color:ansTab===t.id?"#6366f1":"#94a3b8",fontWeight:800,cursor:"pointer",
+                transition:"all .2s",fontSize:13,
+                boxShadow:ansTab===t.id?"0 2px 10px rgba(99,102,241,.14)":"none"}}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+        {ansTab==="text"&&(
+          <textarea value={ansF.text} onChange={e=>setAnsF(f=>({...f,text:e.target.value}))}
+            placeholder="Çözümünüzü yazın..." rows={6}
+            style={{width:"100%",padding:"12px 13px",border:"2px solid #e8eeff",borderRadius:13,
+              fontSize:14,resize:"vertical",outline:"none",color:"#1e1b4b",background:"#f8faff",boxSizing:"border-box"}}
+            onFocus={e=>e.target.style.borderColor="#6366f1"} onBlur={e=>e.target.style.borderColor="#e8eeff"}/>
+        )}
+        {ansTab==="photo"&&(
+          <div>
+            <AskPhotoButtons onFile={f=>imgUpFile(f,"ans")} size="lg"/>
+            {ansF.img
+              ?<div style={{position:"relative",marginTop:4}}>
+                <img src={ansF.img} style={{maxWidth:"100%",maxHeight:300,borderRadius:12,border:"2px solid #c7d2fe",display:"block"}} alt=""/>
+                <button onClick={()=>setAnsF(f=>({...f,img:null}))} style={{position:"absolute",top:8,right:8,
+                  background:"#ef4444",color:"#fff",border:"none",borderRadius:"50%",width:26,height:26,
+                  cursor:"pointer",fontSize:13,fontWeight:800}}>✕</button>
+                <div style={{marginTop:6,fontSize:12,color:"#10b981",fontWeight:700}}>✅ Hazır — aşağıdan gönderin</div>
+              </div>
+              :<div style={{textAlign:"center",padding:16,color:"#a5b4fc",fontSize:13,fontWeight:600,background:"#f8faff",borderRadius:12,marginTop:4}}>
+                Kağıt üzerinde çözdüğünüz soruyu fotoğraflayıp gönderebilirsiniz 📄✏️
+              </div>}
+          </div>
+        )}
+        {ansTab==="draw"&&<DrawCanvas imgUrl={selQ?.img} onSave={d=>setAnsF(f=>({...f,img:d}))}/>}
+        {ansTab==="audio"&&(
+          <div style={{textAlign:"center",padding:"18px 0"}}>
+            <div style={{fontSize:54,marginBottom:14,display:"inline-block",
+              animation:rec?"wiggle .5s ease-in-out infinite":"float 3s ease-in-out infinite"}}>🎙</div>
+            {!rec
+              ?<Btn label="🔴 Kaydı Başlat" onClick={startRec} sz="lg" v="pink"/>
+              :<div>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:13,
+                  background:"#fff1f5",borderRadius:12,padding:"9px 18px",color:"#e11d48",fontWeight:700,
+                  fontSize:14,border:"1.5px solid #fecdd3"}}>
+                  <div style={{width:9,height:9,background:"#ef4444",borderRadius:"50%",animation:"pulseR 1s ease infinite"}}/>
+                  Kaydediliyor...
+                </div>
+                <Btn label="⏹ Durdur" onClick={stopRec} v="danger" sz="lg"/>
+              </div>}
+            {ansF.audio&&(
+              <div style={{marginTop:14,background:"#f0fdf4",borderRadius:12,padding:12,border:"1.5px solid #86efac"}}>
+                <div style={{fontSize:13,color:"#10b981",fontWeight:800,marginBottom:5}}>✅ Hazır!</div>
+                <audio controls src={ansF.audio} style={{width:"100%"}}/>
+              </div>
+            )}
+          </div>
+        )}
+        <div style={{display:"flex",gap:9,marginTop:16,justifyContent:"flex-end"}}>
+          <Btn label="İptal" v="ghost" onClick={()=>setShowAns(false)}/>
+          <Btn label="📤 Gönder" onClick={answer} sz="lg" v="green"/>
+        </div>
+      </Modal>
+
+      <Toast/><LoadingOverlay/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
