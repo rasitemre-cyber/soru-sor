@@ -1420,11 +1420,29 @@ function App(){
                 {pending.map(p=>(
                   <PendingRow key={p.id} p={p} schoolData={schoolData}
                     onApprove={async(updP)=>{
-                      await DB.deletePending(updP.id);
-                      if(updP.role==="teacher") await DB.upsertTeacher(updP);
-                      else await DB.upsertStudent(updP);
-                      await loadData(user.kurum_kodu,user);
-                      toast_(`${p.name} onaylandı! ✅`);
+                      try{
+                        // pending'den sadece hedef tabloda olan kolonları al
+                        const base={id:updP.id,role:updP.role,name:updP.name,kurum_kodu:updP.kurum_kodu,
+                          pass_hash:updP.pass_hash,col:updP.col,av:updP.av,approved:true,ts:updP.ts};
+                        let rec;
+                        if(updP.role==="teacher"){
+                          rec={...base,school:updP.school||"",branches:updP.branches||[],
+                            is_admin:updP.is_admin||false,solved:updP.solved||0};
+                          const r=await sb.from("teachers").upsert(rec,{onConflict:"id"});
+                          if(r.error)throw new Error("Öğretmen kaydı hatası: "+r.error.message);
+                        }else{
+                          rec={...base,number:updP.number||"",cls:updP.cls||"",school:updP.school||"",
+                            photo:updP.photo||null,pdf_matched:updP.pdf_matched||false,q_count:updP.q_count||0};
+                          const r=await sb.from("students").upsert(rec,{onConflict:"id"});
+                          if(r.error)throw new Error("Öğrenci kaydı hatası: "+r.error.message);
+                        }
+                        const rd=await sb.from("pending").delete().eq("id",updP.id);
+                        if(rd.error)throw new Error("Pending silme hatası: "+rd.error.message);
+                        await loadData(user.kurum_kodu,user);
+                        toast_(`${p.name} onaylandı! ✅`);
+                      }catch(err){
+                        toast_("Onay hatası: "+err.message,true);
+                      }
                     }}
                     onReject={async()=>{
                       await DB.deletePending(p.id);
