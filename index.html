@@ -1300,7 +1300,7 @@ function App(){
           </div>
           <nav style={{display:"flex",gap:2,overflowX:"auto",flexShrink:0}}>
             {tabs.map(t=>(
-              <button key={t.id} onClick={()=>{setTab(t.id);if(t.id!=="feed"&&t.id!=="mine")setSelQ(null);}}
+              <button key={t.id} onClick={()=>{setTab(t.id);if(t.id!=="feed"&&t.id!=="mine")setSelQ(null);if(t.id==="admin")loadData(user.kurum_kodu,user);}}
                 style={{padding:"6px 12px",borderRadius:11,border:"none",cursor:"pointer",
                   background:tab===t.id?"rgba(255,255,255,.2)":"transparent",
                   color:tab===t.id?"#fff":"rgba(255,255,255,.7)",
@@ -1374,7 +1374,10 @@ function App(){
 
         {tab==="admin"&&user?.is_admin&&(
           <div style={{animation:"slideUp .3s ease"}}>
-            <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:22,fontWeight:800,color:"#312e81",marginBottom:18}}>⚙️ Yönetim Paneli</div>
+            <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:22,fontWeight:800,color:"#312e81",marginBottom:0}}>
+              <span>⚙️ Yönetim Paneli</span>
+              <button onClick={()=>loadData(user.kurum_kodu,user)} style={{background:"#eef2ff",border:"none",borderRadius:10,padding:"7px 14px",cursor:"pointer",color:"#6366f1",fontWeight:700,fontSize:13,display:"flex",alignItems:"center",gap:5}}>🔄 Yenile {pending.length>0&&<span style={{background:"#ef4444",color:"#fff",borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800}}>{pending.length}</span>}</button>
+            </div>
 
             <Card sx={{marginBottom:14,border:"2px solid #e0e7ff",background:"linear-gradient(135deg,#fafbff,#eef2ff)"}}>
               <div style={{display:"flex",alignItems:"flex-start",gap:14,flexWrap:"wrap"}}>
