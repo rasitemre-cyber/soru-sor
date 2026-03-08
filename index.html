@@ -1324,55 +1324,57 @@ function App(){
         boxShadow:"0 4px 28px rgba(67,56,202,.35)",position:"sticky",top:0,zIndex:200,overflow:"hidden"}}>
         <div style={{position:"absolute",top:-30,right:60,width:130,height:130,
           background:"rgba(255,255,255,.07)",borderRadius:"50%",pointerEvents:"none"}}/>
-        <div style={{maxWidth:1160,margin:"0 auto",padding:"0 14px",display:"flex",alignItems:"center",gap:10,height:60}}>
+        {/* Üst satır: logo + profil/bildirim */}
+        <div style={{maxWidth:1160,margin:"0 auto",padding:"0 14px",display:"flex",alignItems:"center",gap:8,height:52}}>
           <div style={{display:"flex",alignItems:"center",gap:9,flex:1,minWidth:0}}>
-            <span style={{fontSize:26,animation:"float 3s ease-in-out infinite",display:"inline-block",flexShrink:0}}>📚</span>
+            <span style={{fontSize:24,animation:"float 3s ease-in-out infinite",display:"inline-block",flexShrink:0}}>📚</span>
             <div style={{minWidth:0}}>
-              <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:17,color:"#fff",lineHeight:1.1}}>SORU SOR</div>
-              <div style={{fontSize:9,color:"rgba(255,255,255,.5)",letterSpacing:.6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                {config.school_name||config.school||"Okul İçi Q&A"}{user?.kurum_kodu&&` · #${user.kurum_kodu}`}
+              <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#fff",lineHeight:1.1}}>SORU SOR</div>
+              <div style={{fontSize:9,color:"rgba(255,255,255,.5)",letterSpacing:.6,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:140}}>
+                {config.school_name||config.school||"Okul İçi Q&A"}
               </div>
             </div>
           </div>
-          <nav style={{display:"flex",gap:2,overflowX:"auto",flexShrink:0}}>
-            {tabs.map(t=>(
-              <button key={t.id} onClick={()=>{setTab(t.id);if(t.id!=="feed"&&t.id!=="mine")setSelQ(null);if(t.id==="admin")loadData(user.kurum_kodu,user);}}
-                style={{padding:"6px 12px",borderRadius:11,border:"none",cursor:"pointer",
-                  background:tab===t.id?"rgba(255,255,255,.2)":"transparent",
-                  color:tab===t.id?"#fff":"rgba(255,255,255,.7)",
-                  fontSize:12,fontWeight:tab===t.id?800:600,whiteSpace:"nowrap",transition:"all .2s",position:"relative"}}>
-                {t.l}
-                {tab===t.id&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",
-                  width:4,height:4,borderRadius:"50%",background:"#fff"}}/>}
-              </button>
-            ))}
-          </nav>
-          <div style={{display:"flex",alignItems:"center",gap:7,flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
             {isT&&<button onClick={()=>setShowNotif(true)}
-              style={{position:"relative",background:"rgba(255,255,255,.12)",border:"none",borderRadius:11,
-                width:37,height:37,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}
+              style={{position:"relative",background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,
+                width:34,height:34,cursor:"pointer",fontSize:15,display:"flex",alignItems:"center",justifyContent:"center"}}
               onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.22)"}
               onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.12)"}>
-              🔔{unread>0&&<div style={{position:"absolute",top:3,right:3,background:"linear-gradient(135deg,#ec4899,#f43f5e)",
-                color:"#fff",borderRadius:"50%",width:15,height:15,fontSize:9,fontWeight:800,
+              🔔{unread>0&&<div style={{position:"absolute",top:2,right:2,background:"linear-gradient(135deg,#ec4899,#f43f5e)",
+                color:"#fff",borderRadius:"50%",minWidth:15,height:15,fontSize:9,fontWeight:800,padding:"0 2px",
                 display:"flex",alignItems:"center",justifyContent:"center",animation:"pulseR 2s ease infinite"}}>{unread}</div>}
             </button>}
-            <div style={{display:"flex",alignItems:"center",gap:7,background:"rgba(255,255,255,.12)",borderRadius:12,padding:"5px 10px"}}>
-              <Ava i={user?.av||user?.name?.[0]} c={user?.col||"#6366f1"} s={27} photo={user?.photo}/>
-              <span style={{fontSize:12,color:"rgba(255,255,255,.85)",fontWeight:700,maxWidth:70,
+            <div style={{display:"flex",alignItems:"center",gap:5,background:"rgba(255,255,255,.12)",borderRadius:10,padding:"4px 8px"}}>
+              <Ava i={user?.av||user?.name?.[0]} c={user?.col||"#6366f1"} s={24} photo={user?.photo}/>
+              <span style={{fontSize:11,color:"rgba(255,255,255,.85)",fontWeight:700,maxWidth:55,
                 overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.name?.split(" ")[0]}</span>
             </div>
             <button onClick={()=>{setUser(null);setPage("login");setLName("");setLNum("");setLTName("");setLKK("");setLPw("");}}
               style={{background:"rgba(255,255,255,.1)",border:"1.5px solid rgba(255,255,255,.18)",
-                borderRadius:10,padding:"5px 11px",cursor:"pointer",color:"rgba(255,255,255,.75)",
+                borderRadius:9,padding:"4px 9px",cursor:"pointer",color:"rgba(255,255,255,.75)",
                 fontSize:11,fontWeight:700,transition:"all .2s"}}
               onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,.2)"}
               onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,.1)"}>Çıkış</button>
           </div>
         </div>
+        {/* Alt satır: navigasyon sekmeleri - tam genişlik, kaydırılabilir */}
+        <nav style={{display:"flex",gap:0,overflowX:"auto",borderTop:"1px solid rgba(255,255,255,.08)",
+          scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:1}}>
+          {tabs.map(t=>(
+            <button key={t.id} onClick={()=>{setTab(t.id);if(t.id!=="feed"&&t.id!=="mine")setSelQ(null);if(t.id==="admin")loadData(user.kurum_kodu,user);}}
+              style={{flex:1,minWidth:0,padding:"7px 6px 8px",border:"none",cursor:"pointer",
+                background:tab===t.id?"rgba(255,255,255,.15)":"transparent",
+                color:tab===t.id?"#fff":"rgba(255,255,255,.65)",
+                fontSize:11,fontWeight:tab===t.id?800:600,whiteSpace:"nowrap",transition:"all .2s",
+                position:"relative",borderBottom:tab===t.id?"2px solid #a5b4fc":"2px solid transparent"}}>
+              {t.l}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      <main style={{maxWidth:1160,margin:"0 auto",padding:"22px 14px"}}>
+      <main style={{maxWidth:1160,margin:"0 auto",padding:"14px 10px"}}>
 
         {tab==="stats"&&<StatsView allUsers={allUsers} questions={questions}/>}
 
@@ -1519,8 +1521,8 @@ function App(){
         )}
 
         {(tab==="feed"||tab==="mine")&&(
-          <div style={{display:"grid",gridTemplateColumns:selQ?"minmax(260px,1fr) minmax(260px,1.1fr)":"1fr",gap:14,alignItems:"start"}}>
-            <div style={{animation:"slideUp .28s ease"}}>
+          <div style={{display:"grid",gridTemplateColumns:selQ&&window.innerWidth>=700?"minmax(260px,1fr) minmax(280px,1.15fr)":"1fr",gap:14,alignItems:"start"}}>
+            <div style={{animation:"slideUp .28s ease",display:selQ&&window.innerWidth<700?"none":"block"}}>
               <div style={{display:"flex",alignItems:"center",gap:9,marginBottom:13,flexWrap:"wrap"}}>
                 <div style={{fontFamily:"'Baloo 2',sans-serif",fontSize:20,fontWeight:800,color:"#312e81"}}>
                   {tab==="mine"&&isT?"📌 Branşım":tab==="mine"?"📌 Sorularım":"🌊 Soru Havuzu"}
@@ -1565,8 +1567,19 @@ function App(){
 
             {selQ&&(
               <div style={{background:"#fff",borderRadius:22,border:"2px solid #e0e7ff",
-                boxShadow:"0 8px 36px rgba(99,102,241,.11)",maxHeight:"calc(100vh - 125px)",
-                display:"flex",flexDirection:"column",animation:"pop .22s ease",position:"sticky",top:74}}>
+                boxShadow:"0 8px 36px rgba(99,102,241,.11)",
+                maxHeight:window.innerWidth<700?"none":"calc(100vh - 125px)",
+                display:"flex",flexDirection:"column",animation:"pop .22s ease",
+                position:window.innerWidth<700?"relative":"sticky",
+                top:window.innerWidth<700?0:74}}>
+                {/* Mobil geri butonu */}
+                {window.innerWidth<700&&(
+                  <button onClick={()=>setSelQ(null)} style={{display:"flex",alignItems:"center",gap:6,
+                    background:"none",border:"none",cursor:"pointer",padding:"10px 16px 4px",
+                    color:"#6366f1",fontWeight:800,fontSize:14}}>
+                    ← Listeye Dön
+                  </button>
+                )}
                 <div style={{background:`linear-gradient(135deg,${BC[selQ.branch]||"#6366f1"}20,${BC[selQ.branch]||"#6366f1"}06)`,
                   padding:"14px 18px",borderBottom:"1.5px solid #e8eeff",display:"flex",alignItems:"center",
                   justifyContent:"space-between",gap:8,flexWrap:"wrap",borderRadius:"20px 20px 0 0",flexShrink:0}}>
