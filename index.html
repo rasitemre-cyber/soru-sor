@@ -4,6 +4,15 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>📚 SORU SOR</title>
+<meta name="description" content="Okul İçi Soru-Cevap Platformu"/>
+<meta name="theme-color" content="#6366f1"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Soru Sor"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -1702,6 +1711,62 @@ function App(){
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+
+<!-- PWA INSTALL PROMPT -->
+<div id="pwaInstallBar" style="display:none;position:fixed;bottom:0;left:0;right:0;
+  background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;padding:14px 18px;
+  z-index:9999;display:none;align-items:center;justify-content:space-between;
+  box-shadow:0 -4px 24px rgba(99,102,241,.35);gap:12px;flex-wrap:wrap;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="font-size:26px;">📚</span>
+    <div>
+      <div style="font-weight:800;font-size:14px;">Ana Ekrana Ekle</div>
+      <div style="font-size:12px;opacity:.85;">Soru Sor uygulamasını yükle</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <button id="pwaInstallBtn" style="background:#fff;color:#6366f1;border:none;border-radius:10px;
+      padding:9px 18px;font-weight:800;font-size:13px;cursor:pointer;">📲 Yükle</button>
+    <button id="pwaCloseBtn" style="background:rgba(255,255,255,.2);color:#fff;border:none;
+      border-radius:10px;padding:9px 14px;font-weight:700;font-size:13px;cursor:pointer;">✕</button>
+  </div>
+</div>
+
+<script>
+// PWA Install Prompt
+let deferredPrompt = null;
+const bar = document.getElementById('pwaInstallBar');
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  bar.style.display = 'flex';
+});
+
+document.getElementById('pwaInstallBtn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  bar.style.display = 'none';
+});
+
+document.getElementById('pwaCloseBtn').addEventListener('click', () => {
+  bar.style.display = 'none';
+});
+
+window.addEventListener('appinstalled', () => {
+  bar.style.display = 'none';
+  deferredPrompt = null;
+});
+
+// Service Worker kaydet
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
