@@ -1060,31 +1060,54 @@ function App(){
     if(!ansF.text&&!ansF.img&&!ansF.audio){toast_("En az bir format doldur!",true);return;}
     const a={id:uid(),tid:user.id,tName:user.name,tCol:user.col||"#10b981",
       text:ansF.text,img:ansF.img,audio:ansF.audio,ts:new Date().toISOString()};
-    const uq={...selQ,answers:[...selQ.answers,a]};
-    await DB.upsertQuestion(uq);
-
+    const newAnswers=[...selQ.answers,a];
+    // Sadece DB kolonlarını gönder (camelCase normalize alanları çıkar)
+    const uqDB={
+      id:selQ.id,kurum_kodu:selQ.kurum_kodu,
+      sid:selQ.sid,s_name:selQ.s_name||selQ.sName||"",
+      s_col:selQ.s_col||selQ.sCol||"#6366f1",
+      s_photo:selQ.s_photo||selQ.sPhoto||null,
+      cls:selQ.cls||"",branch:selQ.branch,
+      text:selQ.text,img:selQ.img||null,
+      answers:newAnswers,views:selQ.views||0,ts:selQ.ts
+    };
+    try{
+      await DB.upsertQuestion(uqDB);
+    }catch(err){
+      toast_("Cevap gönderilemedi: "+err.message,true);return;
+    }
     // Öğrenciye bildirim
     await DB.addNotif({
       id:uid(),kurum_kodu:user.kurum_kodu,user_id:selQ.sid,
       text:`${user.name} sorunuzu cevapladı! ✅`,
       read:false,q_id:selQ.id,ts:new Date().toISOString()
     });
-
     // Öğretmen çözüm sayacı
     const updT={...user,solved:(user.solved||0)+1};
     await DB.upsertTeacher(updT);
     setUser(p=>({...p,solved:(p.solved||0)+1}));
-    setSelQ(uq);
-    setQuestions(prev=>prev.map(q=>q.id===selQ.id?uq:q));
+    const uqLocal={...selQ,answers:newAnswers};
+    setSelQ(uqLocal);
+    setQuestions(prev=>prev.map(q=>q.id===selQ.id?uqLocal:q));
     setAnsF({text:"",img:null,audio:null});setShowAns(false);
     toast_("Cevabın öğrenciye ulaştı! ✨");
   };
 
   const openQ=async(q)=>{
-    const uq={...q,views:q.views+1};
-    setSelQ(uq);
-    setQuestions(prev=>prev.map(x=>x.id===q.id?uq:x));
-    await DB.upsertQuestion(uq);
+    const uqLocal={...q,views:q.views+1};
+    setSelQ(uqLocal);
+    setQuestions(prev=>prev.map(x=>x.id===q.id?uqLocal:x));
+    // Sadece DB kolonlarını gönder
+    const uqDB={
+      id:q.id,kurum_kodu:q.kurum_kodu,
+      sid:q.sid,s_name:q.s_name||q.sName||"",
+      s_col:q.s_col||q.sCol||"#6366f1",
+      s_photo:q.s_photo||q.sPhoto||null,
+      cls:q.cls||"",branch:q.branch,
+      text:q.text,img:q.img||null,
+      answers:q.answers,views:q.views+1,ts:q.ts
+    };
+    await DB.upsertQuestion(uqDB);
   };
 
   const startRec=async()=>{
