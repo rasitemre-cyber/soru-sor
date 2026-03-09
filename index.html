@@ -302,6 +302,10 @@ const DB = {
     const r=await sb.from("questions").upsert(row,{onConflict:"id"});
     if(r.error)throw new Error("Soru kaydı hatası: "+r.error.message);
   },
+  async deleteQuestion(id){
+    const r=await sb.from("questions").delete().eq("id",id);
+    if(r.error)throw new Error("Soru silme hatası: "+r.error.message);
+  },
 
   // Bildirimler
   async getNotifs(kurumKodu,userId){
@@ -1503,6 +1507,62 @@ function App(){
                   onRefresh={()=>loadData(user.kurum_kodu,user)}
                   toast_={toast_}/>
               ))}
+            </Card>
+
+            <Card sx={{marginBottom:14}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:13,flexWrap:"wrap",gap:8}}>
+                <div style={{fontFamily:"'Baloo 2',sans-serif",fontWeight:800,fontSize:15,color:"#312e81"}}>
+                  🗂 Soru Yönetimi ({questions.length} soru)
+                </div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  <Btn label="Tümünü Sil" sz="sm" v="danger"
+                    onClick={async()=>{
+                      if(!window.confirm("Tüm sorular silinecek! Emin misiniz?"))return;
+                      for(const q of questions){
+                        try{await DB.deleteQuestion(q.id);}catch(e){}
+                      }
+                      await loadData(user.kurum_kodu,user);
+                      toast_("Tüm sorular silindi 🗑");
+                    }}/>
+                  <Btn label="Cevaplanmışları Sil" sz="sm" v="soft"
+                    onClick={async()=>{
+                      const answered=questions.filter(q=>q.answers.length>0);
+                      if(!answered.length){toast_("Cevaplanmış soru yok",true);return;}
+                      if(!window.confirm(`${answered.length} cevaplanmış soru silinecek!`))return;
+                      for(const q of answered){
+                        try{await DB.deleteQuestion(q.id);}catch(e){}
+                      }
+                      await loadData(user.kurum_kodu,user);
+                      toast_(`${answered.length} soru silindi ✅`);
+                    }}/>
+                </div>
+              </div>
+              {questions.length===0
+                ?<div style={{color:"#94a3b8",fontSize:13,textAlign:"center",padding:"10px 0"}}>Henüz soru yok</div>
+                :<div style={{maxHeight:280,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>
+                  {questions.map(q=>(
+                    <div key={q.id} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",
+                      background:q.answers.length>0?"#f0fdf4":"#fefce8",borderRadius:10,
+                      border:`1px solid ${q.answers.length>0?"#bbf7d0":"#fde68a"}`}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:12,fontWeight:700,color:"#1e1b4b",overflow:"hidden",
+                          textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{q.s_name||"?"} — {q.branch}</div>
+                        <div style={{fontSize:11,color:"#64748b",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{q.text}</div>
+                      </div>
+                      <div style={{fontSize:10,color:"#94a3b8",flexShrink:0}}>{q.answers.length>0?"✅":"⏳"}</div>
+                      <button onClick={async()=>{
+                        if(!window.confirm("Bu soru silinecek!"))return;
+                        try{
+                          await DB.deleteQuestion(q.id);
+                          await loadData(user.kurum_kodu,user);
+                          toast_("Soru silindi 🗑");
+                        }catch(err){toast_("Hata: "+err.message,true);}
+                      }} style={{background:"#fee2e2",border:"none",borderRadius:7,padding:"4px 9px",
+                        cursor:"pointer",color:"#ef4444",fontWeight:800,fontSize:12,flexShrink:0}}>🗑</button>
+                    </div>
+                  ))}
+                </div>
+              }
             </Card>
 
             <Card>
