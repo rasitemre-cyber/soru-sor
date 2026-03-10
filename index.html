@@ -773,8 +773,15 @@ function StatsView({allUsers,questions}){
 /* ════════════════ ANA UYGULAMA ════════════════ */
 function App(){
   const[loading,setLoading]=useState(false);
-  const[user,setUser]=useState(null);
-  const[page,setPage]=useState("login");
+  // Oturum kalıcılığı — localStorage
+  const savedSession = (()=>{
+    try{
+      const s=localStorage.getItem("sorusor_session");
+      return s?JSON.parse(s):null;
+    }catch{return null;}
+  })();
+  const[user,setUser]=useState(savedSession);
+  const[page,setPage]=useState(savedSession?"app":"login");
 
   // Tüm veriler state'te
   const[teachers,setTeachers]=useState([]);
@@ -904,7 +911,9 @@ function App(){
     if(!t){toast_("Öğretmen bulunamadı. Önce kayıt olun.",true);return;}
     if(hashPw(lPw)!==t.pass_hash){toast_("Şifre hatalı! 🔒",true);return;}
     if(!t.approved){toast_("Hesabın henüz admin onayı bekliyor ⏳",true);return;}
-    setUser({...t,role:"teacher"});
+    const tUser={...t,role:"teacher"};
+    setUser(tUser);
+    try{localStorage.setItem("sorusor_session",JSON.stringify(tUser));}catch{}
     await loadData(lKK.trim(),t);
     setPage("app");setTab("feed");
     toast_(`Hoş geldin, ${t.name.split(" ")[0]}! 👋`);
@@ -927,7 +936,9 @@ function App(){
     }
     if(hashPw(lPw)!==s.pass_hash){toast_("Şifre hatalı! 🔒",true);return;}
     if(!s.approved){toast_("Hesabın henüz onaylanmadı ⏳",true);return;}
-    setUser({...s,role:"student"});
+    const sUser={...s,role:"student"};
+    setUser(sUser);
+    try{localStorage.setItem("sorusor_session",JSON.stringify(sUser));}catch{}
     await loadData(s.kurum_kodu,s);
     setPage("app");setTab("feed");
     toast_(`Hoş geldin, ${s.name.split(" ")[0]}! 🎉`);
@@ -1137,6 +1148,13 @@ function App(){
   const imgUpFile=(f,t)=>{if(!f)return;const r=new FileReader();r.onload=ev=>{if(t==="ask")setAF(p=>({...p,img:ev.target.result}));else setAnsF(p=>({...p,img:ev.target.result}));};r.readAsDataURL(f);};
 
   const isT=user?.role==="teacher";
+  // Sayfa ilk açılınca kayıtlı oturum varsa veriyi yükle
+  useEffect(()=>{
+    if(savedSession&&page==="app"){
+      loadData(savedSession.kurum_kodu, savedSession);
+    }
+  },[]);
+
   const myBr=user?.branches||[];
   const allUsers=[...teachers,...students];
 
@@ -1354,7 +1372,7 @@ function App(){
               <span style={{fontSize:11,color:"rgba(255,255,255,.85)",fontWeight:700,maxWidth:55,
                 overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{user?.name?.split(" ")[0]}</span>
             </div>
-            <button onClick={()=>{setUser(null);setPage("login");setLName("");setLNum("");setLTName("");setLKK("");setLPw("");}}
+            <button onClick={()=>{try{localStorage.removeItem("sorusor_session");}catch{}setUser(null);setPage("login");setLName("");setLNum("");setLTName("");setLKK("");setLPw("");}}
               style={{background:"rgba(255,255,255,.1)",border:"1.5px solid rgba(255,255,255,.18)",
                 borderRadius:9,padding:"4px 9px",cursor:"pointer",color:"rgba(255,255,255,.75)",
                 fontSize:11,fontWeight:700,transition:"all .2s"}}
