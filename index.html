@@ -705,7 +705,7 @@ function StatsView({allUsers,questions}){
   const teachers=allUsers.filter(u=>u.role==="teacher"&&u.approved);
   const students=allUsers.filter(u=>u.role==="student"&&u.approved);
   const answered=questions.filter(q=>q.answers.length>0).length;
-  const topS=[...students].sort((a,b)=>(b.q_count||0)-(a.q_count||0)).slice(0,5);
+  const topS=[...students].sort((a,b)=>((b.total_q||b.q_count||0))-((a.total_q||a.q_count||0))).slice(0,5);
   const topT=[...teachers].sort((a,b)=>(b.solved||0)-(a.solved||0)).slice(0,5);
   const brs=BRANCHES.map(b=>({b,c:questions.filter(q=>q.branch===b).length})).filter(x=>x.c>0).sort((a,b)=>b.c-a.c);
   const medals=["🥇","🥈","🥉","4️⃣","5️⃣"];
@@ -735,7 +735,7 @@ function StatsView({allUsers,questions}){
             <span style={{width:22,textAlign:"center",fontSize:16}}>{medals[i]}</span>
             <Ava i={s.av||s.name[0]} c={s.col||"#6366f1"} s={30} photo={s.photo}/>
             <div style={{flex:1}}><div style={{fontWeight:700,fontSize:13,color:"#1e1b4b"}}>{s.name}</div><div style={{fontSize:10,color:"#94a3b8"}}>{s.cls}</div></div>
-            <span style={{fontWeight:900,fontSize:17,color:"#f59e0b",fontFamily:"'Baloo 2',sans-serif"}}>{s.q_count||0}</span>
+            <span style={{fontWeight:900,fontSize:17,color:"#f59e0b",fontFamily:"'Baloo 2',sans-serif"}}>{s.total_q||s.q_count||0}</span>
           </div>)}
         </div>
       </Card>
@@ -840,16 +840,35 @@ function App(){
     return p==="granted";
   };
 
+  // Ana ekrana eklenmiş mi? Badge API varsa PWA olarak yüklü demektir
+  // Bu durumda bildirim iznini otomatik iste
+  useEffect(()=>{
+    if(page!=="app")return;
+    if(!("Notification" in window))return;
+    if(Notification.permission!=="default")return;
+    // Badge API destekleniyorsa = ana ekrana eklenmiş PWA
+    if(navigator.setAppBadge){
+      // Kısa gecikme — uygulama tamamen yüklendikten sonra iste
+      const t=setTimeout(()=>{
+        Notification.requestPermission().catch(()=>{});
+      },1500);
+      return()=>clearTimeout(t);
+    }
+  },[page]);
+
   const sendPushNotif=(title,body,icon="./icon-192.png")=>{
     if(!("Notification" in window)||Notification.permission!=="granted")return;
     try{
       if(navigator.serviceWorker?.controller){
         navigator.serviceWorker.ready.then(reg=>{
-          reg.showNotification(title,{body,icon,badge:icon,vibrate:[100,50,100],
-            data:{url:window.location.href}});
-        }).catch(()=>{
-          new Notification(title,{body,icon});
-        });
+          reg.showNotification(title,{
+            body,icon,badge:"./icon-192.png",
+            vibrate:[200,100,200],
+            tag:"sorusor-notif",   // aynı tag = eski bildirimi günceller, spam olmaz
+            renotify:true,
+            data:{url:window.location.href}
+          });
+        }).catch(()=>new Notification(title,{body,icon}));
       } else {
         new Notification(title,{body,icon});
       }
@@ -1102,11 +1121,10 @@ function App(){
     // Öğrencinin kendi cihazında push (gönderim onayı)
     sendPushNotif("✅ Sorun Gönderildi",`${aF.branch} branşına sorunuz iletildi.`);
 
-    // Öğrenci soru sayacını DB'den gerçek sayıyla güncelle
-    const{data:qRows}=await sb.from("questions").select("id",{count:"exact"}).eq("sid",user.id);
-    const realCount=(qRows?.length||0);
-    await DB.upsertStudent({...user,q_count:realCount});
-    setUser(p=>{const nu={...p,q_count:realCount};try{localStorage.setItem("sorusor_session",JSON.stringify(nu));}catch{}return nu;});
+    // Toplam soru sayacını artır (silinse de azalmaz)
+    const newTotalQ=(user.total_q||0)+1;
+    await DB.upsertStudent({...user,total_q:newTotalQ,q_count:newTotalQ});
+    setUser(p=>{const nu={...p,total_q:newTotalQ,q_count:newTotalQ};try{localStorage.setItem("sorusor_session",JSON.stringify(nu));}catch{}return nu;});
     setQuestions(prev=>[q,...prev]);
     setAF({branch:"",text:"",img:null});setTab("feed");
     toast_("Sorun havuza gönderildi! 🚀");
@@ -1241,6 +1259,16 @@ function App(){
   });
 
   const unread=notifs.filter(n=>!n.read).length;
+
+  // PWA Badge API — simge üzerinde okunmamış sayısı
+  React.useEffect(()=>{
+    if(!navigator.setAppBadge) return;
+    if(unread>0){
+      navigator.setAppBadge(unread).catch(()=>{});
+    } else {
+      navigator.clearAppBadge().catch(()=>{});
+    }
+  },[unread]);
   const tabs=isT
     ?[{id:"feed",l:"🏠 Akış"},{id:"mine",l:"📌 Branşım"},{id:"stats",l:"📊 İstatistik"},...(user?.is_admin?[{id:"admin",l:"⚙️ Yönetim"}]:[])]
     :[{id:"feed",l:"🏠 Akış"},{id:"ask",l:"❓ Soru Sor"},{id:"mine",l:"📌 Sorularım"},{id:"stats",l:"📊 İstatistik"}];
