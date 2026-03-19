@@ -1102,9 +1102,11 @@ function App(){
     // Öğrencinin kendi cihazında push (gönderim onayı)
     sendPushNotif("✅ Sorun Gönderildi",`${aF.branch} branşına sorunuz iletildi.`);
 
-    // Öğrenci soru sayacını artır
-    await DB.upsertStudent({...user,q_count:(user.q_count||0)+1});
-    setUser(p=>({...p,q_count:(p.q_count||0)+1}));
+    // Öğrenci soru sayacını DB'den gerçek sayıyla güncelle
+    const{data:qRows}=await sb.from("questions").select("id",{count:"exact"}).eq("sid",user.id);
+    const realCount=(qRows?.length||0);
+    await DB.upsertStudent({...user,q_count:realCount});
+    setUser(p=>{const nu={...p,q_count:realCount};try{localStorage.setItem("sorusor_session",JSON.stringify(nu));}catch{}return nu;});
     setQuestions(prev=>[q,...prev]);
     setAF({branch:"",text:"",img:null});setTab("feed");
     toast_("Sorun havuza gönderildi! 🚀");
