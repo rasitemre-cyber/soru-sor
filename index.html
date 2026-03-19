@@ -832,6 +832,52 @@ function App(){
 
   // Veri yükleme
   // ── Push Bildirim Yardımcıları ──────────────────────────────
+  const VAPID_PUBLIC="BKo1M0VyrmdLrbrJ5E-7lHZYRzIlXSwqG6ni-8Ksi3isW2FhBJt3UpaKhgz82sXXl13i_gRwtixrVe7_SN4JSW0";
+  const EDGE_PUSH_URL="https://cwiaiizwxmjoiwmerava.supabase.co/functions/v1/push-notify";
+
+  const urlB64ToUint8=(b64)=>{
+    const pad=b64.replace(/-/g,"+").replace(/_/g,"/");
+    const raw=atob(pad);
+    return Uint8Array.from({length:raw.length},(_,i)=>raw.charCodeAt(i));
+  };
+
+  // Kullanıcının push subscription'ını kaydet
+  const registerPush=async(u)=>{
+    if(!("serviceWorker" in navigator)||!("PushManager" in window))return;
+    if(Notification.permission!=="granted")return;
+    try{
+      const reg=await navigator.serviceWorker.ready;
+      let sub=await reg.pushManager.getSubscription();
+      if(!sub){
+        sub=await reg.pushManager.subscribe({
+          userVisibleOnly:true,
+          applicationServerKey:urlB64ToUint8(VAPID_PUBLIC)
+        });
+      }
+      const j=sub.toJSON();
+      await sb.from("push_subscriptions").upsert({
+        user_id:u.id,
+        kurum_kodu:u.kurum_kodu,
+        role:u.role||"student",
+        endpoint:j.endpoint,
+        p256dh:j.keys.p256dh,
+        auth:j.keys.auth
+      },{onConflict:"endpoint"});
+    }catch(e){console.warn("Push kayıt hatası:",e);}
+  };
+
+  // Edge Function üzerinden push gönder
+  const sendEdgePush=async(user_ids,title,body,kurum_kodu)=>{
+    try{
+      await fetch(EDGE_PUSH_URL,{
+        method:"POST",
+        headers:{"Content-Type":"application/json",
+          "Authorization":"Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3aWFpaXp3eG1qb2l3bWVyYXZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4OTY5NjEsImV4cCI6MjA4ODQ3Mjk2MX0.iZeK7r8sm5j61apKfPMNgcEVyGjIallWv3EfF9uHFmE"},
+        body:JSON.stringify({user_ids,kurum_kodu,title,body})
+      });
+    }catch(e){}
+  };
+
   const requestNotifPerm=async()=>{
     if(!("Notification" in window))return false;
     if(Notification.permission==="granted")return true;
@@ -962,7 +1008,8 @@ function App(){
     await loadData(lKK.trim(),t);
     setPage("app");setTab("feed");
     toast_(`Hoş geldin, ${t.name.split(" ")[0]}! 👋`);
-    requestNotifPerm();
+    const granted=await requestNotifPerm();
+    if(granted) await registerPush(tUser);
   };
 
   const loginStudent=async()=>{
@@ -988,7 +1035,8 @@ function App(){
     await loadData(s.kurum_kodu,s);
     setPage("app");setTab("feed");
     toast_(`Hoş geldin, ${s.name.split(" ")[0]}! 🎉`);
-    requestNotifPerm();
+    const sGranted=await requestNotifPerm();
+    if(sGranted) await registerPush(sUser);
   };
 
   /* ── AUTH: KAYIT ── */
@@ -1110,16 +1158,24 @@ function App(){
       toast_("Soru gönderilemedi: "+err.message,true);return;
     }
 
-    // DB bildirimleri + Push bildirimi
-    for(const t of teachers.filter(t=>t.branches?.includes(aF.branch)&&t.approved)){
+    // DB bildirimleri + Edge Push
+    const branchTeachers=teachers.filter(t=>t.branches?.includes(aF.branch)&&t.approved);
+    for(const t of branchTeachers){
       await DB.addNotif({
         id:uid(),kurum_kodu:user.kurum_kodu,user_id:t.id,
         text:`Yeni ${aF.branch} sorusu ${BE[aF.branch]||""}`,
         read:false,q_id:q.id,ts:new Date().toISOString()
       });
     }
-    // Öğrencinin kendi cihazında push (gönderim onayı)
-    sendPushNotif("✅ Sorun Gönderildi",`${aF.branch} branşına sorunuz iletildi.`);
+    // Öğretmenlere sunucu push gönder
+    if(branchTeachers.length){
+      sendEdgePush(
+        branchTeachers.map(t=>t.id),
+        `📚 Yeni ${aF.branch} Sorusu`,
+        `${user.name}: ${aF.text.slice(0,80)}`,
+        user.kurum_kodu
+      );
+    }
 
     // Toplam soru sayacını artır (silinse de azalmaz)
     const newTotalQ=(user.total_q||0)+1;
@@ -1156,8 +1212,13 @@ function App(){
       text:`${user.name} sorunuzu cevapladı! ✅`,
       read:false,q_id:selQ.id,ts:new Date().toISOString()
     });
-    // Öğretmenin kendi cihazında push (gönderim onayı)
-    sendPushNotif("✅ Cevap Gönderildi",`${selQ.s_name||"Öğrenci"} için cevabınız iletildi.`);
+    // Öğrenciye sunucu push gönder
+    sendEdgePush(
+      [selQ.sid],
+      `✅ Sorunuz Cevaplandı`,
+      `${user.name}: ${(selQ.text||"").slice(0,60)}`,
+      user.kurum_kodu
+    );
     // Öğretmen çözüm sayacı
     const updT={...user,solved:(user.solved||0)+1};
     await DB.upsertTeacher(updT);
