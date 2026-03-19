@@ -1266,6 +1266,10 @@ function App(){
   useEffect(()=>{
     if(savedSession&&page==="app"){
       loadData(savedSession.kurum_kodu, savedSession);
+      // Sayfa açılışında push subscription'ı yenile
+      if("Notification" in window && Notification.permission==="granted"){
+        registerPush(savedSession).catch(()=>{});
+      }
     }
   },[]);
 
