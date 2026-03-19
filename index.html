@@ -346,6 +346,39 @@ const Tag=({label,color="#6366f1",emoji=""})=>
     {emoji&&<span>{emoji}</span>}{label}
   </span>;
 
+function BellBtn({user, registerPush, toast_, sb}){
+  const[hasS,setHasS]=React.useState(null);
+  React.useEffect(()=>{
+    if(!user)return;
+    (async()=>{
+      // Bu kullanıcının subscription'ı var mı?
+      const r=await sb.from("push_subscriptions").select("id").eq("user_id",user.id).limit(1);
+      setHasS(r.data?.length>0);
+    })();
+  },[user?.id]);
+
+  if(hasS===null||hasS===true)return null; // yükleniyor veya zaten kayıtlı
+
+  return(
+    <button onClick={async()=>{
+      try{
+        const p=await Notification.requestPermission();
+        if(p==="granted"){
+          await registerPush(user);
+          setHasS(true);
+          toast_("Bildirimler etkinleştirildi! 🔔");
+        } else {
+          toast_("Bildirim izni reddedildi",true);
+        }
+      }catch(e){toast_("Hata: "+e.message,true);}
+    }} style={{background:"linear-gradient(135deg,#f59e0b,#f97316)",border:"none",
+      borderRadius:10,padding:"5px 10px",cursor:"pointer",color:"#fff",
+      fontSize:11,fontWeight:800,animation:"pulseR 2s ease infinite",flexShrink:0}}>
+      🔔 Bildirimleri Aç
+    </button>
+  );
+}
+
 function Btn({label,onClick,v="primary",sz="md",disabled,full,sx={}}){
   const vs={
     primary:{bg:"linear-gradient(135deg,#6366f1,#8b5cf6)",c:"#fff",sh:"0 4px 14px #6366f155"},
@@ -1516,18 +1549,8 @@ function App(){
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
             {/* Bildirim izni verilmemişse buton göster */}
-            {"Notification" in window && Notification.permission!=="granted" && (
-              <button onClick={async()=>{
-                const p = await Notification.requestPermission();
-                if(p==="granted"){
-                  await registerPush(user);
-                  toast_("Bildirimler etkinleştirildi! 🔔");
-                }
-              }} style={{background:"linear-gradient(135deg,#f59e0b,#f97316)",border:"none",
-                borderRadius:10,padding:"5px 10px",cursor:"pointer",color:"#fff",
-                fontSize:11,fontWeight:800,animation:"pulseR 2s ease infinite"}}>
-                🔔 Bildirimleri Aç
-              </button>
+            {"Notification" in window && Notification.permission!=="denied" && (
+              <BellBtn user={user} registerPush={registerPush} toast_={toast_} sb={sb}/>
             )}
             {isT&&<button onClick={()=>setShowNotif(true)}
               style={{position:"relative",background:"rgba(255,255,255,.12)",border:"none",borderRadius:10,
