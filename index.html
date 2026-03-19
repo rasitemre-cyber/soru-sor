@@ -831,6 +831,32 @@ function App(){
   const toast_=(m,err=false)=>{setToast(m);setTE(err);setTimeout(()=>setToast(null),3500);};
 
   // Veri yükleme
+  // ── Push Bildirim Yardımcıları ──────────────────────────────
+  const requestNotifPerm=async()=>{
+    if(!("Notification" in window))return false;
+    if(Notification.permission==="granted")return true;
+    if(Notification.permission==="denied")return false;
+    const p=await Notification.requestPermission();
+    return p==="granted";
+  };
+
+  const sendPushNotif=(title,body,icon="./icon-192.png")=>{
+    if(!("Notification" in window)||Notification.permission!=="granted")return;
+    try{
+      if(navigator.serviceWorker?.controller){
+        navigator.serviceWorker.ready.then(reg=>{
+          reg.showNotification(title,{body,icon,badge:icon,vibrate:[100,50,100],
+            data:{url:window.location.href}});
+        }).catch(()=>{
+          new Notification(title,{body,icon});
+        });
+      } else {
+        new Notification(title,{body,icon});
+      }
+    }catch(e){}
+  };
+  // ────────────────────────────────────────────────────────────
+
   const loadData=useCallback(async(kurumKodu,currentUser)=>{
     if(!kurumKodu)return;
     setLoading(true);
@@ -917,6 +943,7 @@ function App(){
     await loadData(lKK.trim(),t);
     setPage("app");setTab("feed");
     toast_(`Hoş geldin, ${t.name.split(" ")[0]}! 👋`);
+    requestNotifPerm();
   };
 
   const loginStudent=async()=>{
@@ -942,6 +969,7 @@ function App(){
     await loadData(s.kurum_kodu,s);
     setPage("app");setTab("feed");
     toast_(`Hoş geldin, ${s.name.split(" ")[0]}! 🎉`);
+    requestNotifPerm();
   };
 
   /* ── AUTH: KAYIT ── */
@@ -1063,7 +1091,7 @@ function App(){
       toast_("Soru gönderilemedi: "+err.message,true);return;
     }
 
-    // Bildirimleri gönder
+    // DB bildirimleri + Push bildirimi
     for(const t of teachers.filter(t=>t.branches?.includes(aF.branch)&&t.approved)){
       await DB.addNotif({
         id:uid(),kurum_kodu:user.kurum_kodu,user_id:t.id,
@@ -1071,6 +1099,8 @@ function App(){
         read:false,q_id:q.id,ts:new Date().toISOString()
       });
     }
+    // Öğrencinin kendi cihazında push (gönderim onayı)
+    sendPushNotif("✅ Sorun Gönderildi",`${aF.branch} branşına sorunuz iletildi.`);
 
     // Öğrenci soru sayacını artır
     await DB.upsertStudent({...user,q_count:(user.q_count||0)+1});
@@ -1100,12 +1130,14 @@ function App(){
     }catch(err){
       toast_("Cevap gönderilemedi: "+err.message,true);return;
     }
-    // Öğrenciye bildirim
+    // Öğrenciye DB bildirimi
     await DB.addNotif({
       id:uid(),kurum_kodu:user.kurum_kodu,user_id:selQ.sid,
       text:`${user.name} sorunuzu cevapladı! ✅`,
       read:false,q_id:selQ.id,ts:new Date().toISOString()
     });
+    // Öğretmenin kendi cihazında push (gönderim onayı)
+    sendPushNotif("✅ Cevap Gönderildi",`${selQ.s_name||"Öğrenci"} için cevabınız iletildi.`);
     // Öğretmen çözüm sayacı
     const updT={...user,solved:(user.solved||0)+1};
     await DB.upsertTeacher(updT);
@@ -1120,6 +1152,7 @@ function App(){
   const openQ=async(q)=>{
     const uqLocal={...q,views:q.views+1};
     setSelQ(uqLocal);
+    history.pushState({tab,selQ:q.id},"","");
     setQuestions(prev=>prev.map(x=>x.id===q.id?uqLocal:x));
     // Sadece DB kolonlarını gönder
     const uqDB={
@@ -1154,6 +1187,35 @@ function App(){
       loadData(savedSession.kurum_kodu, savedSession);
     }
   },[]);
+
+  // ── Mobil Geri Tuşu — History API ───────────────────────────
+  // Uygulama açılınca başlangıç geçmişi ekle
+  useEffect(()=>{
+    if(page!=="app")return;
+    // İlk state
+    history.replaceState({tab:"feed",selQ:null},"","");
+
+    const onPop=(e)=>{
+      const st=e.state;
+      if(!st)return;
+      // selQ açıksa önce onu kapat
+      if(st.selQ===null){
+        setSelQ(null);
+      }
+      if(st.tab){
+        setTab(st.tab);
+      }
+      // Geçmişte daha fazla kayıt yoksa uygulamadan çıkma, başa dön
+      if(!e.state){
+        history.pushState({tab:"feed",selQ:null},"","");
+        setTab("feed");setSelQ(null);
+      }
+    };
+
+    window.addEventListener("popstate",onPop);
+    return()=>window.removeEventListener("popstate",onPop);
+  },[page]);
+  // ────────────────────────────────────────────────────────────
 
   const myBr=user?.branches||[];
   const allUsers=[...teachers,...students];
@@ -1384,7 +1446,13 @@ function App(){
         <nav style={{display:"flex",gap:0,overflowX:"auto",borderTop:"1px solid rgba(255,255,255,.08)",
           scrollbarWidth:"none",WebkitOverflowScrolling:"touch",paddingBottom:1}}>
           {tabs.map(t=>(
-            <button key={t.id} onClick={()=>{setTab(t.id);if(t.id!=="feed"&&t.id!=="mine")setSelQ(null);if(t.id==="admin")loadData(user.kurum_kodu,user);}}
+            <button key={t.id} onClick={()=>{
+                  const prev=tab;
+                  setTab(t.id);
+                  if(t.id!=="feed"&&t.id!=="mine")setSelQ(null);
+                  if(t.id==="admin")loadData(user.kurum_kodu,user);
+                  history.pushState({tab:t.id,selQ:null},"","");
+                }}
               style={{flex:1,minWidth:0,padding:"7px 6px 8px",border:"none",cursor:"pointer",
                 background:tab===t.id?"rgba(255,255,255,.15)":"transparent",
                 color:tab===t.id?"#fff":"rgba(255,255,255,.65)",

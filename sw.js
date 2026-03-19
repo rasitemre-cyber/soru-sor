@@ -1,4 +1,4 @@
-const CACHE = 'sorusor-v1';
+const CACHE = 'sorusor-v2';
 const ASSETS = ['./'];
 
 self.addEventListener('install', e => {
@@ -14,9 +14,24 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Supabase API isteklerini cache'leme
   if (e.request.url.includes('supabase.co')) return;
   e.respondWith(
     fetch(e.request).catch(() => caches.match(e.request))
+  );
+});
+
+// Bildirime tıklanınca uygulamayı aç / öne getir
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = e.notification.data?.url || './';
+  e.waitUntil(
+    clients.matchAll({type:'window', includeUncontrolled:true}).then(list => {
+      for (const client of list) {
+        if (client.url.includes('soru-sor') && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) return clients.openWindow(url);
+    })
   );
 });
